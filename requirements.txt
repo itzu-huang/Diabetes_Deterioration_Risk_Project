@@ -1,112 +1,17 @@
-# Core data analysis and machine learning
-numpy
-pandas
-scipy
-scikit-learn
-matplotlib
-seaborn
-
-# Excel file support
-openpyxl
-xlrd
-
-# Advanced models and model interpretation
-xgboost
-shap
-
-# LSTM / deep learning
-tensorflow
-
-# ============================================================
-# 糖三臟取西經 —— 五支主程式套件版本鎖定
-# 依據：2026 年作者本機環境（Windows + Anaconda）conda list 實際查詢結果
-# 查詢方式：Anaconda Prompt 執行 `conda list`（或 IPython 執行 check_versions_spyder.py）
-# ============================================================
-
-# ---- 直譯器 ----
-# Python 3.13.9 | packaged by Anaconda, Inc. (MSC v.1929 64-bit AMD64)
-
-# ---- 五支程式共用（資料處理／分類／迴歸／風險合成／成本模擬）----
+# Research environment: Python 3.13.9
+# Verification also requires the document libraries listed below.
 pandas==2.3.3
 numpy==2.3.5
-scikit-learn==1.7.2
 scipy==1.16.3
+scikit-learn==1.7.2
 matplotlib==3.10.6
+seaborn==0.13.2
 openpyxl==3.1.5
 xlrd==2.0.2
-
-# ---- diabetes_deterioration_pipeline.py 專用（主要模型與可解釋性）----
 xgboost==3.3.0
 shap==0.52.0
-
-# ---- cgm_lstm_markov.py 專用（LSTM 逐人與合併訓練）----
 tensorflow==2.21.0
 keras==3.15.0
-
-# ---- EDA 缺失值熱圖 ----
-seaborn==0.13.2
-
-# ============================================================
-# 【前置資料】
-# ============================================================
-# 執行前須將 Shanghai_T2DM 連續血糖監測壓縮檔解壓為與程式同目錄之
-# Shanghai_T2DM/ 資料夾（109 個 .xls／.xlsx），並確認 Shanghai_T2DM_Summary.xlsx
-# 位於同目錄。
-#
-# 【執行順序】五支程式有相依關係，請依序執行：
-#   1. diabetes_deterioration_pipeline.py   → output/
-#   2. diabetes_regression.py               → output_reg/（import 上者之 load_data）
-#   3. cgm_lstm_markov.py                   → cgm_output/
-#   4. deterioration_risk.py                → output_risk/
-#   5. lifetime_cost_montecarlo.py          → output_cost_mc/（讀 output_risk/ 併入象限）
-# 另 cgm_lstm_markov.py 內部亦有順序性：lstm_forecast_pooled() 之對照圖需
-# lstm_forecast_all() 先產生 lstm_vs_baseline_all.csv 方能繪出。
-
-# ============================================================
-# 【重現性說明一】分類模型：AUC 對「交叉驗證分折方式」敏感
-# ============================================================
-# 本專案分類與風險合成採 GroupKFold(n_splits=5)，依病患分組以杜絕病患層級洩漏，
-# 但該切分器不做類別分層。本資料 43 筆陽性於五折之分布為 13 / 7 / 9 / 5 / 9，
-# 各折 AUC 介於 0.812 至 0.983，故整體平均 AUC 對「哪些病患落在哪一折」相當敏感。
-#
-# 實測確認：此敏感性來自分折配置，而非數值運算後端。
-#   - 同一環境下改用 liblinear / lbfgs / saga 三種求解器，AUC 完全相同（皆 0.882）
-#     → 排除 BLAS/LAPACK（MKL vs OpenBLAS）為成因
-#   - 改用不同版本之 scikit-learn（1.7.2 → 1.8.0），因 GroupKFold 之
-#     群組→折次配置演算法不同，Any_Complication 目標 AUC 由 0.821 變為 0.882
-#     → 分折配置為真正成因
-#
-# → 欲重現書面報告表 4-3-1 之數值，請務必鎖定 scikit-learn==1.7.2。
-# → 後續改良建議改採 StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=…)，
-#   並跨多組 random_state 取平均±標準差，以獲得穩定且不依賴特定分折之效能估計。
-#   （實測 10 組種子：任一併發症 0.871±0.016、小血管 0.822±0.028、大血管 0.862±0.014）
-
-# ============================================================
-# 【重現性說明二】LSTM：每次執行結果必然略有差異
-# ============================================================
-# cgm_lstm_markov.py 之 lstm_forecast()、lstm_forecast_all()、lstm_forecast_pooled()
-# 三個函式即使已固定 tf.random.set_seed(SEED)，每次執行仍會得到略微不同之結果。
-# 原因為 TensorFlow 預設以多執行緒進行矩陣運算，各執行緒完成順序不定，浮點數累加
-# 順序隨之改變；浮點加法不滿足結合律，該微小差異經多輪梯度更新後被放大，使權重
-# 收斂至略有不同之位置。此非程式錯誤，亦與亂數種子無關。
-#
-# 變動幅度（本研究重複執行實測）：
-#   逐人專屬模型：改善中位數 18–22%、勝過基準比例 66–71%（樣本量小，擺盪較大）
-#   跨病患合併訓練：改善中位數 36.8–37.4%、勝過基準比例 99–100%（樣本量大，穩定）
-# 書面報告第肆章第七節已載明上述區間，所報數值宜視為區間中之一次實現。
-#
-# 其餘輸出皆為確定性計算，重複執行完全一致：CGM 指標、馬可夫轉移矩陣與收斂診斷、
-# AGP、血糖波動圖、持續性基準、分類／迴歸模型、分群、蒙地卡羅成本模擬。
-#
-# → 若需完全可重現之 LSTM，可加入下列兩行（代價為訓練速度下降）：
-#     tf.keras.utils.set_random_seed(SEED)
-#     tf.config.experimental.enable_op_determinism()
-#   惟啟用後所得數值將與本報告所載不同，須連同圖表一併重新產生。
-
-# ============================================================
-# 【安裝方式】
-# ============================================================
-#   pip install -r requirements.txt
-# 或（Anaconda 使用者建議逐一以 conda 安裝核心套件、pip 安裝 xgboost/shap/tensorflow）：
-#   conda install pandas=2.3.3 numpy=2.3.5 scikit-learn=1.7.2 scipy=1.16.3 matplotlib=3.10.6 openpyxl=3.1.5
-#   pip install xlrd==2.0.2 xgboost==3.3.0 shap==0.52.0 tensorflow==2.21.0 keras==3.15.0 seaborn==0.13.2
+python-docx
+python-pptx
+Pillow

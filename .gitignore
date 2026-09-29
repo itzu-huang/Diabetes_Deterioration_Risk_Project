@@ -1,45 +1,50 @@
-# Data files
-data/clinical/*.xlsx
-data/clinical/*.xls
-data/cgm/*.xlsx
-data/cgm/*.xls
-
-# Legacy input paths currently used by scripts
-/Shanghai_T2DM_Summary.xlsx
-/Shanghai_T2DM/
-
-# Protect all files inside data directories
-/data/clinical/**
-!/data/clinical/.gitkeep
-/data/cgm/**
-!/data/cgm/.gitkeep
-
-# Output and results
-output/**
-!output/.gitkeep
-!output/*/.gitkeep
-
-# Legacy output paths currently used by scripts
-/output_reg/
-/cgm_output/
-/output_risk/
-/output_cost_mc/
-
-# Python
-__pycache__/
-*.pyc
-.ipynb_checkpoints/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Model files
+# Raw clinical data and patient-level analysis outputs
+Shanghai_T2DM/
+Shanghai_T2DM_Summary.xlsx
+data/**
+!data/clinical/.gitkeep
+!data/cgm/.gitkeep
+output/
+output_reg/
+output_risk/
+output_cost_mc/
+cgm_output/
+figures_v2/
+reference/
+reference_teacher/
+reference_old_*/
+logs*/
+run_log.json
+env_lock.json
+data_manifest.json
+verify_report_*
+*_mismatch.csv
+# Prevent accidental data/archive publication; verification allowlist is public rules.
+*.csv
+!verification/allowlist.csv
+*.tsv
+*.xls
+*.xlsx
+*.zip
+*.parquet
+*.pkl
+*.pickle
+*.joblib
 *.keras
 *.h5
 checkpoints/
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+secrets*.json
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db

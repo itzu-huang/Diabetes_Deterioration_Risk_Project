@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 CGM 時間序列分析:血糖波動圖 + 馬可夫轉移矩陣 + LSTM 血糖預測
 ============================================================
@@ -9,34 +10,46 @@ CGM 時間序列分析:血糖波動圖 + 馬可夫轉移矩陣 + LSTM 血糖預�
        當作額外特徵或分層依據(這是把 CGM 接進主模型的橋樑)。
   2) 血糖狀態馬可夫轉移矩陣(3 態與 5 態)+ 熱圖 + 長期穩態分布。
   3) LSTM 逐步血糖預測(用過去 N 筆預測下一筆)+ 實際 vs 預測「血糖波動圖」。
-  4) 跨病患 pooled LSTM：將訓練病患的視窗合併訓練共同模型，
-     並依病患分組交叉驗證，與 persistence baseline 及逐監測模型比較。
 
 環境:Colab / Jupyter。需要 pandas, numpy, matplotlib, scikit-learn, tensorflow。
 讀 .xls 需要 xlrd:  pip install xlrd tensorflow
 (若你已先用 LibreOffice 把 .xls 轉成 .xlsx,就不需要 xlrd。)
 
 固定 random_state=42;輸出寫入 ./cgm_output/。
-
-----------------------------------------------------------------
-【時間序列 X / Y 定義與限制】
-----------------------------------------------------------------
-LSTM 的 X:
-  過去 look_back=12 筆 CGM（若每筆確為 15 分鐘，約為過去 3 小時）。
-
-LSTM 的 Y:
-  下一筆 CGM（horizon=1；若時間間隔有效，約為 15 分鐘後血糖）。
-
-Markov:
-  狀態轉移必須建立在真正相鄰的時間點上。若研究要宣稱「15 分鐘轉移」，
-  正式分析應僅保留約 14–16 分鐘的時間差，並避免跨缺測區段與重複時間戳。
-
-目前注意:
-  markov_matrix() 的預設 max_gap_min=30，表示 30 分鐘內的間隔仍可能被計入；
-  這不是嚴格的 15 分鐘轉移。報告需誠實註明，或後續改為 14–16 分鐘篩選。
+〔稽核修正 B-07〕亂數種子之實際作法:原程式只設 np.random.seed 與 tf.random.set_seed,
+  但 Keras 3 之權重初始化種子取自 Python 內建 random(本專案從未設定),故每次執行之
+  初始權重都不同,「固定種子」並未生效。現改為每個 LSTM 函式開始時呼叫
+  random.seed(SEED) + keras.utils.set_random_seed(SEED)(同時設定 Python、NumPy、TF 與
+  Keras 全域種子),並開啟 tf.config.experimental.enable_op_determinism()。
+  實測(同一台機器、兩個獨立行程):初始權重、訓練後權重、預測值與輸出 CSV 逐位元相同。
+  ※ 不同作業系統/CPU 之間仍可能不同(浮點運算路徑不同),故報告之 LSTM 數字應以
+    學生本機(Windows)那一次完整執行為準。
+〔稽核修正 C-02〕圖 4-7-5(lstm_forecast_2000.png)改由 lstm_forecast_all() 中該筆紀錄
+  之同一個模型繪製,圖上 RMSE 即等於 lstm_vs_baseline_all.csv 之值;main() 不再另外
+  單獨訓練一個 epochs=40 之模型。
+〔稽核修正 C-03〕圖 4-7-1(cgm_metrics_dist.png)改為六格(平均血糖、CV、GMI、TIR、
+  TBR、TAR),與表 4-7-1 及正文「六項」一致。
 """
 
+
+# ---------------------------------------------------------------------------
+# [修正 32] Windows 主控台編碼防護。
+#   本專案之輸出含 ✓ ≤ − ä ² ≈ 等字元,不在繁體中文 Windows 之預設編碼 cp950 內。
+#   當 stdout 是「主控台」時 Python 走 WriteConsoleW,不受影響;但當 stdout 被
+#   導向「管線」(例如 verify_all.py 以 capture_output=True 抓取子程序輸出,或
+#   使用者自行 `python x.py > log.txt`)時,Python 改用地區編碼 cp950 編碼,
+#   即拋出 UnicodeEncodeError 並中止 —— 程式本身沒錯,卻因為印不出一個勾勾而失敗。
+#   此處只改「遇到無法編碼之字元時的行為」(改為以 ? 取代),不動編碼本身,
+#   故主控台顯示維持正常。
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    try:
+        _s.reconfigure(errors="replace")
+    except Exception:
+        pass
+# ---------------------------------------------------------------------------
 import os
+import sys
 import glob
 import numpy as np
 import pandas as pd
@@ -58,10 +71,67 @@ def _show():
 
 SEED = 42
 np.random.seed(SEED)
+# 〔稽核修正 B-07〕Python 內建 random 亦須設定:Keras 3 之權重初始化種子取自它。
+import random
+random.seed(SEED)
 
 CGM_DIR = "Shanghai_T2DM"          # 放 109 個 CGM 檔的資料夾(.xls 或 .xlsx 皆可)
 OUTDIR = "cgm_output"
 os.makedirs(OUTDIR, exist_ok=True)
+
+# 〔稽核修正 B-16〕本程式之 LSTM 段落所產生之檔案。沒有 tensorflow 又未設 SKIP_LSTM 時,
+#   main() 會刪除這些舊檔並以非 0 結束,不讓上一次執行留下的 LSTM 結果冒充本次結果。
+LSTM_OUTPUTS = ["lstm_vs_baseline_all.csv", "lstm_vs_baseline_all.png",
+                "lstm_pooled_vs_baseline.csv", "lstm_pooled_vs_perpatient.png",
+                "lstm_forecast_2000.png"]
+
+
+class TensorFlowMissing(RuntimeError):
+    """〔稽核修正 B-16〕只有 import tensorflow/keras 發生 ImportError(未安裝,或 Windows 上
+    「DLL load failed」這類載入失敗)時才會拋出此例外,訊息內附原始錯誤;其他種類之例外
+    (例如設定種子或建模時之錯誤)一律原樣拋出,不再被當成「沒有 tensorflow」而吞掉。"""
+
+
+def _keras_setup(seed=None):
+    """〔稽核修正 B-07〕〔稽核修正 B-16〕載入 tensorflow/keras 並固定全部亂數來源。
+    每個 LSTM 函式開始時各呼叫一次,使該函式之結果只取決於(資料、設定、SEED),
+    與之前是否跑過其他函式無關。seed=None 時用 SEED;pooled_ph.py 於每折開始時
+    以 SEED+折號 呼叫,使「中斷後續跑」與「一次跑完」之結果相同。
+
+    - random.seed + keras.utils.set_random_seed:後者同時設定 Python random、NumPy、
+      TF 全域種子並重設 Keras 之全域 SeedGenerator(權重初始化、Dropout、洗牌)。
+    - tf.config.experimental.enable_op_determinism():要求 TF 只用確定性之運算實作;
+      若某運算沒有確定性實作會直接報錯,而不是默默產生不可重現之結果。
+      實測(Linux、CPU):開啟與否結果逐位元相同、速度差異在量測誤差內
+      (見 _測試紀錄/CODE/B-07_種子/)。
+    """
+    try:
+        import tensorflow as tf
+        import keras
+    except ImportError as e:   # 只有「沒安裝」才當成沒有 tensorflow;其他例外照常拋出
+        raise TensorFlowMissing(
+            "找不到 tensorflow/keras(ImportError: %s)。LSTM 段落需要 tensorflow;"
+            "請執行 pip install -r requirements.txt,或以 run_all.py --skip-lstm "
+            "(設定 SKIP_LSTM=1)明確略過。" % e) from e
+    s = SEED if seed is None else int(seed)
+    random.seed(s)
+    keras.utils.set_random_seed(s)
+    tf.config.experimental.enable_op_determinism()
+    return tf, keras
+
+
+def build_lstm_model(look_back=12, n_out=1, units=64):
+    """〔稽核修正 B-12〕全專案 LSTM 之唯一架構定義(逐人版、合併版、pooled_ph.py、
+    make_diagnostics.py 之參數量皆由此而來):LSTM(units) → Dropout(0.2) → Dense(n_out)。
+    units=64、look_back=12、n_out=1 時參數量為 16,961(LSTM 16,896 + Dense 65)。
+    呼叫前須先 _keras_setup()(或自行 import tensorflow)。"""
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    return Sequential([
+        LSTM(units, input_shape=(look_back, 1)),
+        Dropout(0.2),
+        Dense(n_out),
+    ])
 
 
 # ------------------------------------------------------------------ #
@@ -176,13 +246,17 @@ def markov_matrix(n_states=3, max_gap_min=30):
     plt.colorbar(im, fraction=0.046)
     plt.tight_layout(); plt.savefig(f"{OUTDIR}/markov_{n_states}state.png", dpi=150); _show()
 
+    # [修正 19] 原輸出第一欄(狀態名)無標頭,讀檔者無從判斷列是「自」或「至」。
+    #   轉移矩陣 P[i][j] = P(下一時點為 j | 現在為 i),故列為「自」、欄為「至」。
     pd.DataFrame(P, index=labels, columns=labels).to_csv(
-        f"{OUTDIR}/markov_{n_states}state.csv", encoding="utf-8-sig")
+        f"{OUTDIR}/markov_{n_states}state.csv",
+        index_label="from_state（列=自；欄=至）", encoding="utf-8-sig")
     print(f"\n[markov] {n_states}-state 轉移矩陣 → cgm_output/markov_{n_states}state.png / .csv")
     print("  states:", labels)
     print("  P=\n", np.round(P, 3))
     print("  長期穩態分布(≈各狀態時間占比):", dict(zip(labels, np.round(stat, 3))))
     return P, labels, stat
+
 
 def markov_convergence(P, labels, start_state="InRange", steps=None, tag="",
                        step_min=15):
@@ -222,22 +296,26 @@ def markov_convergence(P, labels, start_state="InRange", steps=None, tag="",
     lam2 = float(ev[1]) if n > 1 else 0.0
     half_steps = np.log(0.5) / np.log(lam2) if 0 < lam2 < 1 else float("nan")
 
+    # 〔稽核修正 A-19〕原寫檔前先 round(百分比 2 位、lambda2 4 位、半衰期 2 位),
+    #   報告再從 CSV 進位一次即成「雙重進位」:|λ2| 全精度 0.887474 → CSV 0.8875 → 報告 0.888
+    #   (正確應為 0.887)。現改為全精度寫出(數值本身不變,只是不再先捨入),由報告端
+    #   依需要之位數一次進位。hours 為 k×15/60,本身即為精確值,維持原寫法。
     rows = []
     for k in steps:
         v = np.linalg.matrix_power(P, k)[si]
         rows.append({"k_steps": k, "hours": round(k * step_min / 60, 2),
-                     **{str(l): round(float(x) * 100, 2) for l, x in zip(labels, v)},
-                     "max_dev_from_stationary_pp": round(float(np.abs(v - pi).max()) * 100, 2)})
+                     **{str(l): float(x) * 100 for l, x in zip(labels, v)},
+                     "max_dev_from_stationary_pp": float(np.abs(v - pi).max()) * 100})
     rows.append({"k_steps": "stationary", "hours": "inf",
-                 **{str(l): round(float(x) * 100, 2) for l, x in zip(labels, pi)},
+                 **{str(l): float(x) * 100 for l, x in zip(labels, pi)},
                  "max_dev_from_stationary_pp": 0.0})
     C = pd.DataFrame(rows)
     C.to_csv(f"{OUTDIR}/markov_convergence{tag}.csv", index=False, encoding="utf-8-sig")
 
-    S = pd.DataFrame([{**{str(l): round(float(x) * 100, 2) for l, x in zip(labels, pi)},
-                       "lambda2": round(lam2, 4),
-                       "half_life_steps": round(float(half_steps), 2),
-                       "half_life_hours": round(float(half_steps) * step_min / 60, 2),
+    S = pd.DataFrame([{**{str(l): float(x) * 100 for l, x in zip(labels, pi)},
+                       "lambda2": lam2,
+                       "half_life_steps": float(half_steps),
+                       "half_life_hours": float(half_steps) * step_min / 60,
                        "start_state": labels[si]}])
     S.to_csv(f"{OUTDIR}/markov_stationary{tag}.csv", index=False, encoding="utf-8-sig")
 
@@ -326,15 +404,26 @@ def plot_fluctuation_grid(n=12):
 
 
 def plot_metrics_distribution(met):
-    fig, axes = plt.subplots(1, 3, figsize=(13, 3.2))
-    for ax, (col, lab) in zip(axes, [("TIR", "TIR (%)"), ("GMI", "GMI (%)"), ("CV", "CV (%)")]):
+    # 〔稽核修正 C-03〕原圖只有 TIR、GMI、CV 三格,報告正文(¶608)卻稱「六項血糖控制指標之
+    #   分布」並描述圖中不存在之 TBR 分布。改為與表 4-7-1 相同之六項、同一順序(2 列 × 3 格),
+    #   並加畫中位數線(正文 ¶605 引用者為中位數)。
+    panels = [("mean", "Mean glucose (mg/dL)"), ("CV", "CV (%)"), ("GMI", "GMI (%)"),
+              ("TIR", "TIR, 70–180 mg/dL (%)"), ("TBR", "TBR, <70 mg/dL (%)"),
+              ("TAR", "TAR, >180 mg/dL (%)")]
+    fig, axes = plt.subplots(2, 3, figsize=(13, 6.4))
+    for ax, (col, lab) in zip(axes.ravel(), panels):
         ax.hist(met[col], bins=20, color="#0d9488", edgecolor="white")
         ax.axvline(met[col].mean(), color="#dc2626", ls="--", lw=1.2, label=f"mean={met[col].mean():.1f}")
+        ax.axvline(met[col].median(), color="#1e293b", ls=":", lw=1.2,
+                   label=f"median={met[col].median():.1f}")
         ax.set_title(lab); ax.legend(fontsize=8)
-    fig.suptitle("Distribution of CGM metrics across recordings", y=1.03)
+    fig.suptitle(f"Distribution of CGM metrics across recordings (n={len(met)})", y=1.01)
     plt.tight_layout(); plt.savefig(f"{OUTDIR}/cgm_metrics_dist.png", dpi=150, bbox_inches="tight"); _show()
-    met[["mean", "CV", "GMI", "TIR", "TBR", "TAR"]].describe().T.round(2).to_csv(
-        f"{OUTDIR}/cgm_descriptive.csv", encoding="utf-8-sig")
+    # 〔稽核修正 A-19〕原 .round(2) 後寫檔:例如 CV 中位數全精度 27.448 → CSV 27.45 → 若再依此
+    #   進位至 1 位即成 27.5(報告 ¶605 之 27.4 才正確)。改為全精度寫出,由引用端一次進位。
+    met[["mean", "CV", "GMI", "TIR", "TBR", "TAR"]].describe().T.to_csv(
+        f"{OUTDIR}/cgm_descriptive.csv",
+        index_label="metric", encoding="utf-8-sig")   # [修正 19]
     print(f"[dist] cgm_output/cgm_metrics_dist.png / cgm_descriptive.csv")
 
 
@@ -342,6 +431,11 @@ def plot_metrics_distribution(met):
 # 5. LSTM 逐步血糖預測 + 實際 vs 預測波動圖
 # ------------------------------------------------------------------ #
 def make_windows(series, look_back, horizon=1):
+    # 〔稽核修正 CODE-24〕(僅註明,未改演算法)本函式依「讀值順序」切視窗,不看時間戳;
+    #   馬可夫矩陣(markov_matrix、deterioration_risk.transition_matrix)則排除間隔 >30 分鐘
+    #   之相鄰配對。兩者對資料斷點之口徑不同。實測 109 檔共 112,178 個相鄰間隔中僅 3 個
+    #   >30 分鐘(另 7 個恰 30 分鐘),PH=15 分之測試視窗 22,498 個中 49 個(0.22%)跨越
+    #   >15 分鐘之間隔,影響可忽略;若要一致,可改為遇斷點即分段切視窗。
     X, y = [], []
     for i in range(len(series) - look_back - horizon + 1):
         X.append(series[i:i + look_back])
@@ -354,21 +448,18 @@ def lstm_forecast(patient_prefix="2000", look_back=12, horizon=1, epochs=40):
     對單一病患做 next-step 血糖預測(look_back=12 ≈ 過去 3 小時 → 預測下一個 15 分鐘)。
     以時間切分:前 80% 訓練、後 20% 測試;標準化只用訓練段統計量(避免洩漏)。
     需要 tensorflow。若要對多位病患,外面包一層迴圈或改成 pooled 訓練即可。
+
+    〔稽核修正 C-02〕main() 已不再呼叫本函式:報告圖 4-7-5 改由 lstm_forecast_all() 中
+    同一筆紀錄之同一模型繪製(見該函式 plot_record_prefix)。本函式保留供單獨試驗,
+    但輸出檔名改為 lstm_forecast_{病患}_standalone.png,以免覆蓋報告所用之圖。
     """
-    try:
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout
-        from tensorflow.keras.callbacks import EarlyStopping
-        import tensorflow as tf
-        tf.random.set_seed(SEED)
-    except Exception:
-        print("\n[LSTM] 找不到 tensorflow,略過 LSTM。請在 Colab 執行:pip install tensorflow")
-        return None
+    _keras_setup()   # 〔稽核修正 B-07／B-16〕固定全部亂數來源;只有 ImportError 才視為缺 tensorflow
+    from tensorflow.keras.callbacks import EarlyStopping
 
     files = [f for f in list_cgm_files() if os.path.basename(f).startswith(str(patient_prefix))]
     if not files:
-        print(f"[LSTM] 找不到病患 {patient_prefix} 的檔案。")
-        return None
+        # 〔稽核修正 B-16〕原為印一行後 return None(呼叫端無從得知失敗),改為拋出例外。
+        raise FileNotFoundError(f"[LSTM] 找不到病患 {patient_prefix} 的 CGM 檔。")
     fp = files[0]
     s = load_one(fp)
     g = s["cgm"].values.astype("float32")
@@ -381,11 +472,7 @@ def lstm_forecast(patient_prefix="2000", look_back=12, horizon=1, epochs=40):
     Xtr = Xtr.reshape(-1, look_back, 1)
     Xte = Xte.reshape(-1, look_back, 1)
 
-    model = Sequential([
-        LSTM(64, input_shape=(look_back, 1)),
-        Dropout(0.2),
-        Dense(horizon),
-    ])
+    model = build_lstm_model(look_back, horizon)   # 〔稽核修正 B-12〕與其他 LSTM 共用同一架構定義
     model.compile(optimizer="adam", loss="mse", metrics=["mae"])
     es = EarlyStopping(patience=8, restore_best_weights=True)
     model.fit(Xtr, ytr, validation_split=0.15, epochs=epochs, batch_size=32,
@@ -403,7 +490,9 @@ def lstm_forecast(patient_prefix="2000", look_back=12, horizon=1, epochs=40):
     baseline = Xte[:, -1, 0] * sd + mu
     baseline_rmse = float(np.sqrt(np.mean((baseline - true) ** 2)))
     baseline_mae = float(np.mean(np.abs(baseline - true)))
-    skill = (1 - rmse / baseline_rmse) * 100 if baseline_rmse > 0 else 0.0  # RMSE 相對改善(%)
+    # 〔稽核修正 CODE-26〕基準 RMSE 為 0 時技巧分數無定義:原本逐人版退回 0.0、合併版退回 NaN,
+    #   兩版口徑不一;統一為 NaN(現行資料無基準 RMSE 為 0 之紀錄,不影響任何輸出)。
+    skill = (1 - rmse / baseline_rmse) * 100 if baseline_rmse > 0 else np.nan  # RMSE 相對改善(%)
 
     # 實際 vs 預測 波動圖(測試段)
     ts_test = s["ts"].values[n_train:n_train + len(true)]
@@ -413,13 +502,14 @@ def lstm_forecast(patient_prefix="2000", look_back=12, horizon=1, epochs=40):
     plt.plot(ts_test, pred, color="#dc2626", lw=1.2, ls="--", label="LSTM predicted")
     plt.plot(ts_test, baseline, color="#6b7280", lw=1.0, ls=":", label="Persistence baseline")
     plt.ylabel("CGM (mg/dL)")
-    plt.title(f"LSTM next-step forecast — patient {patient_prefix}  "
+    plt.title(f"LSTM next-step forecast — patient {patient_prefix} (standalone model)  "
               f"(LSTM RMSE={rmse:.1f} vs baseline {baseline_rmse:.1f} mg/dL)")
     plt.legend(loc="upper right", fontsize=8); plt.tight_layout()
-    plt.savefig(f"{OUTDIR}/lstm_forecast_{patient_prefix}.png", dpi=150); _show()
+    _fn = f"lstm_forecast_{patient_prefix}_standalone.png"   # 〔稽核修正 C-02〕不覆蓋報告圖
+    plt.savefig(f"{OUTDIR}/{_fn}", dpi=150); _show()
     print(f"\n[LSTM] 病患 {patient_prefix}:LSTM RMSE={rmse:.1f}/MAE={mae:.1f};"
           f"持續性基準 RMSE={baseline_rmse:.1f}/MAE={baseline_mae:.1f} mg/dL"
-          f"(RMSE 相對改善 {skill:.1f}%)→ cgm_output/lstm_forecast_{patient_prefix}.png")
+          f"(RMSE 相對改善 {skill:.1f}%)→ cgm_output/{_fn}")
     return dict(patient=patient_prefix, rmse=rmse, mae=mae,
                 baseline_rmse=baseline_rmse, baseline_mae=baseline_mae, skill_pct=skill)
 
@@ -458,29 +548,52 @@ def baseline_all(look_back=12):
     return B
 
 
-def lstm_forecast_all(look_back=12, horizon=1, epochs=30, n_patients=None, verbose=True):
+def _plot_record_forecast(rid, prefix, ts_test, true, pred, base, l_rmse, b_rmse):
+    """〔稽核修正 C-02〕以 lstm_forecast_all() 中「同一個模型」之測試段預測繪製單筆紀錄之
+    實際 vs 預測圖(報告圖 4-7-5、簡報第 14 張所用之 lstm_forecast_{prefix}.png)。
+    圖上 RMSE 與 lstm_vs_baseline_all.csv 該列之 lstm_rmse / baseline_rmse 為同一數值。"""
+    plt.figure(figsize=(11, 3.4))
+    plt.axhspan(70, 180, color="#86efac", alpha=0.30)
+    plt.plot(ts_test, true, color="#1d4ed8", lw=1.2, label="Actual")
+    plt.plot(ts_test, pred, color="#dc2626", lw=1.2, ls="--", label="LSTM predicted")
+    plt.plot(ts_test, base, color="#6b7280", lw=1.0, ls=":", label="Persistence baseline")
+    plt.ylabel("CGM (mg/dL)")
+    # 標題沿用原圖格式;RMSE 改印 2 位小數,與 lstm_vs_baseline_all.csv 引用位數一致
+    plt.title(f"LSTM next-step forecast — patient {prefix}  "
+              f"(LSTM RMSE={l_rmse:.2f} vs baseline {b_rmse:.2f} mg/dL)")
+    plt.legend(loc="upper right", fontsize=8); plt.tight_layout()
+    plt.savefig(f"{OUTDIR}/lstm_forecast_{prefix}.png", dpi=150); _show()
+    print(f"[LSTM-all] {rid}:LSTM RMSE={l_rmse:.4f}、基準 RMSE={b_rmse:.4f}"
+          f"(與 lstm_vs_baseline_all.csv 同一模型)→ {OUTDIR}/lstm_forecast_{prefix}.png")
+
+
+def lstm_forecast_all(look_back=12, horizon=1, epochs=30, n_patients=None, verbose=True,
+                      plot_record_prefix="2000"):
     """
     對「全部病患」逐一訓練 LSTM 並與持續性基準比較,輸出比較表與圖。
     n_patients:限制數量(例如先設 20 試跑);None = 全部。
     注意:109 位逐一訓練約需數分鐘至數十分鐘,建議先用 n_patients 小量測試。
+    plot_record_prefix:〔稽核修正 C-02〕檔名以此開頭之第一筆紀錄(依檔名排序,與原
+      lstm_forecast() 之選法相同;"2000" → 2000_0_20201230),以本函式訓練之同一模型輸出
+      lstm_forecast_{prefix}.png;None 則不畫。
     """
-    try:
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout
-        from tensorflow.keras.callbacks import EarlyStopping
-        import tensorflow as tf
-        tf.random.set_seed(SEED)
-    except Exception:
-        print("\n[LSTM-all] 找不到 tensorflow,略過。請執行:pip install tensorflow")
-        return None
+    _keras_setup()   # 〔稽核修正 B-07／B-16〕固定全部亂數來源;只有 ImportError 才視為缺 tensorflow
+    from tensorflow.keras.callbacks import EarlyStopping
 
     files = list_cgm_files()
     if n_patients:
         files = files[:n_patients]
+    if plot_record_prefix is not None and not any(
+            os.path.basename(f).startswith(str(plot_record_prefix)) for f in files):
+        # 〔稽核修正 B-16〕找不到要畫的紀錄時於訓練前即明確報錯,不讓舊圖冒充本次結果
+        raise FileNotFoundError(f"[LSTM-all] 找不到檔名以 {plot_record_prefix} 開頭之紀錄,"
+                                f"無法產生 lstm_forecast_{plot_record_prefix}.png")
     rows = []
+    plotted = False
     for i, fp in enumerate(files, 1):
         rid = os.path.splitext(os.path.basename(fp))[0]
-        g = load_one(fp)["cgm"].values.astype("float32")
+        s = load_one(fp)
+        g = s["cgm"].values.astype("float32")
         if len(g) < look_back + 20:
             continue
         n_train = int(len(g) * 0.8)
@@ -490,7 +603,7 @@ def lstm_forecast_all(look_back=12, horizon=1, epochs=30, n_patients=None, verbo
         Xte, yte = make_windows(gz[n_train - look_back:], look_back, horizon)
         Xtr = Xtr.reshape(-1, look_back, 1); Xte = Xte.reshape(-1, look_back, 1)
 
-        model = Sequential([LSTM(64, input_shape=(look_back, 1)), Dropout(0.2), Dense(horizon)])
+        model = build_lstm_model(look_back, horizon)   # 〔稽核修正 B-12〕共用架構定義
         model.compile(optimizer="adam", loss="mse")
         model.fit(Xtr, ytr, validation_split=0.15, epochs=epochs, batch_size=32,
                   callbacks=[EarlyStopping(patience=8, restore_best_weights=True)], verbose=0)
@@ -503,9 +616,19 @@ def lstm_forecast_all(look_back=12, horizon=1, epochs=30, n_patients=None, verbo
         rows.append(dict(record=rid, patient=rid.split("_")[0],
                          lstm_rmse=lr_, lstm_mae=float(np.mean(np.abs(pred - true))),
                          baseline_rmse=br_, baseline_mae=float(np.mean(np.abs(base - true))),
-                         skill_pct=(1 - lr_ / br_) * 100 if br_ > 0 else 0.0))
+                         # 〔稽核修正 CODE-26〕分母為 0 時與合併版同為 NaN(原為 0.0)
+                         skill_pct=(1 - lr_ / br_) * 100 if br_ > 0 else np.nan))
+        if (plot_record_prefix is not None and not plotted
+                and os.path.basename(fp).startswith(str(plot_record_prefix))):
+            ts_test = s["ts"].values[n_train:n_train + len(true)]
+            _plot_record_forecast(rid, plot_record_prefix, ts_test, true, pred, base, lr_, br_)
+            plotted = True
         if verbose and i % 10 == 0:
             print(f"  ...已完成 {i}/{len(files)}")
+    if plot_record_prefix is not None and not plotted:
+        # 〔稽核修正 B-16〕該紀錄因資料過短被略過等情形:明確報錯,不留舊圖冒充本次結果
+        raise RuntimeError(f"[LSTM-all] 紀錄 {plot_record_prefix}* 未完成訓練,"
+                           f"無法產生 lstm_forecast_{plot_record_prefix}.png")
 
     R = pd.DataFrame(rows)
     R.to_csv(f"{OUTDIR}/lstm_vs_baseline_all.csv", index=False, encoding="utf-8-sig")
@@ -545,31 +668,24 @@ def lstm_forecast_pooled(look_back=12, horizon=1, epochs=30, n_folds=5,
 
     與 lstm_forecast_all()(每人各訓練一個模型)的差異:
       - 逐人版:每位病患用自己的前 80% 訓練專屬模型。訓練窗平均僅約 810 個,
-               而 LSTM(64) 約有 16,900 個參數,序列較短者具有較高的過度擬合風險。
+               而 LSTM(64) 連同輸出層共 16,961 個參數(〔稽核修正 B-12〕原寫「約 16,900」,
+               為手寫近似值;實算見 build_lstm_model().count_params()),序列較短者必然過擬合。
       - 本函式:把全部病患的訓練段合併成一個訓練集(約 88,000 個窗)訓練單一模型,
                參數與樣本比例回到合理範圍。
 
     驗證設計(關鍵):
       依「病患編號」而非「監測紀錄」分成 n_folds 組(同一病患的多次回診必在同一組)。
       每一折以其餘病患的訓練段配適模型,再預測本折病患的測試段——
-      模型權重未使用測試折病患資料進行訓練；
-      但每位測試病患仍使用自己的歷史訓練段估計標準化平均值與標準差。
-      因此這是未見病患權重泛化搭配個人化尺度校正，不是完全零資料的 cold-start 預測。
+      模型完全沒看過這些病患的任何資料,故所得指標為「對全新病患」的泛化表現,
+      而非單純的樣本內配適。此為合併訓練必須做的驗證,否則會被質疑模型已見過該病患。
 
     標準化:各病患仍以「自己訓練段」的平均與標準差正規化,預測後再還原回 mg/dL,
            故合併訓練不會因病患間血糖水準差異而失真。
 
     輸出:cgm_output/lstm_pooled_vs_baseline.csv、lstm_pooled_vs_perpatient.png
     """
-    try:
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout
-        from tensorflow.keras.callbacks import EarlyStopping
-        import tensorflow as tf
-        tf.random.set_seed(SEED)
-    except Exception:
-        print("\n[LSTM-pooled] 找不到 tensorflow,略過。請執行:pip install tensorflow")
-        return None
+    _keras_setup()   # 〔稽核修正 B-07／B-16〕固定全部亂數來源;只有 ImportError 才視為缺 tensorflow
+    from tensorflow.keras.callbacks import EarlyStopping
 
     rng = np.random.RandomState(SEED)
 
@@ -607,11 +723,7 @@ def lstm_forecast_pooled(look_back=12, horizon=1, epochs=30, n_folds=5,
     fold_of_pid = {pids[j]: k % n_folds for k, j in enumerate(perm)}
 
     def build():
-        m = Sequential([
-            LSTM(units, input_shape=(look_back, 1)),
-            Dropout(0.2),
-            Dense(horizon),
-        ])
+        m = build_lstm_model(look_back, horizon, units)   # 〔稽核修正 B-12〕共用架構定義
         m.compile(optimizer="adam", loss="mse")
         return m
 
@@ -718,18 +830,47 @@ def main():
     print("=" * 60)
 
     met = build_metrics_table()          # 1. 指標(可併回 Summary)
-    markov_matrix(n_states=3)             # 2a. 3 態馬可夫
-    markov_matrix(n_states=5)             # 2b. 5 態馬可夫
+    P3, L3, _ = markov_matrix(n_states=3)          # 2a. 3 態馬可夫
+    markov_convergence(P3, L3, tag="_3state")      # 2c. 3 態收斂診斷
+    P5, L5, _ = markov_matrix(n_states=5)          # 2b. 5 態馬可夫
+    markov_convergence(P5, L5, tag="_5state")      # 2d. 5 態收斂診斷
     plot_agp()                            # 3a. AGP:全部病患合併(日內百分位)
     plot_fluctuation_grid(n=12)           # 3b. 12 位示範網格
-    plot_metrics_distribution(met)        # 3c. TIR/GMI/CV 分布 + 描述統計
+    plot_metrics_distribution(met)        # 3c. 六項 CGM 指標分布 + 描述統計(〔稽核修正 C-03〕原寫 TIR/GMI/CV)
     plot_fluctuation(n_examples=3)        # 3d. 個別波動圖(改 None 可畫全部 109 位)
-    lstm_forecast(patient_prefix="2000")  # 4. LSTM 預測 + 實際vs預測圖(單一病患)
     baseline_all()                        # 5a. 全體病患的持續性基準(不需 tensorflow)
-    # 5b. 全體病患 LSTM vs 基準(較耗時;可先用 n_patients=20 試跑)
-    lstm_forecast_all(epochs=30, n_patients=None)
-    # 5c. 跨病患合併訓練 + 病患分組交叉驗證(丙案);需先跑完 5b 才能產生對照圖
-    lstm_forecast_pooled(epochs=30, n_folds=5)
+    # [修正 D] run_all.py --skip-lstm 會設 SKIP_LSTM=1,略過耗時的深度學習段落。
+    #          Markov、CGM 指標、AGP、持續性基準等確定性結果仍完整產出。
+    if os.environ.get("SKIP_LSTM") == "1":
+        print("\n[SKIP_LSTM=1] 略過 LSTM 段落(逐人版、合併訓練版、單筆預測圖)。")
+        # 〔稽核修正 B-16〕明白列出未更新之舊檔,避免誤以為是本次結果
+        _old = [f for f in LSTM_OUTPUTS if os.path.exists(os.path.join(OUTDIR, f))]
+        if _old:
+            print(f"  ★ 以下 LSTM 檔案「未」重新產生,仍為先前執行之結果:{', '.join(_old)}")
+    else:
+        # 〔稽核修正 B-16〕先確認 tensorflow 可用。原寫法是在各 LSTM 函式內以 except Exception
+        #   吞下任何錯誤、印一行後 return,程式仍以 0 結束,cgm_output/ 內舊的 LSTM CSV 就被
+        #   當成本次結果。現改為:只有 ImportError 視為「沒有 tensorflow」→ 刪除舊 LSTM 檔、
+        #   說明原因並以非 0 結束;其他例外原樣拋出(Python 亦以非 0 結束)。
+        try:
+            _keras_setup()
+        except TensorFlowMissing as e:
+            _gone = []
+            for f in LSTM_OUTPUTS:
+                p = os.path.join(OUTDIR, f)
+                if os.path.exists(p):
+                    os.remove(p); _gone.append(f)
+            print(f"\n[錯誤] {e}")
+            if _gone:
+                print(f"  已刪除先前執行留下之 LSTM 檔(避免被誤當本次結果):{', '.join(_gone)}")
+            sys.exit(2)
+        # 〔稽核修正 C-02〕原本另以 lstm_forecast(patient_prefix="2000", epochs=40) 單獨訓練一個
+        #   模型畫圖 4-7-5,圖上 RMSE(約 5.7)與正文取自下一行之同一病患值(5.94)出自不同次
+        #   訓練。現改由 lstm_forecast_all() 以同一模型畫該圖(plot_record_prefix="2000")。
+        # 5b. 全體病患 LSTM vs 基準(較耗時;可先用 n_patients=20 試跑)+ 圖 4-7-5
+        lstm_forecast_all(epochs=30, n_patients=None, plot_record_prefix="2000")
+        # 5c. 跨病患合併訓練 + 病患分組交叉驗證;需先跑完 5b 才能產生對照圖
+        lstm_forecast_pooled(epochs=30, n_folds=5)
 
     print(f"\n完成。所有輸出在 ./{OUTDIR}/")
     print("圖:markov_3state.png、markov_5state.png、fluctuation_*.png、lstm_forecast_*.png")
