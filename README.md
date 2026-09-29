@@ -6,7 +6,7 @@
 
 ## App
 
-[開啟糖三臟研究示範 App](https://itzuakatsuki.github.io/Diabetes_Deterioration_Risk_Project/)
+[開啟糖三臟研究示範 App](https://itzu-huang.github.io/Diabetes_Deterioration_Risk_Project/)
 
 GitHub Pages 使用 `main` 分支的 `/docs`。`docs/index.html` 以相對路徑導向 App；Excel 解析使用同目錄內的 `vendor/xlsx.full.min.js`。使用者匯入的資料在瀏覽器內處理。
 
