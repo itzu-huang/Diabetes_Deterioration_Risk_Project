@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>糖三臟｜糖尿病風險與餘生醫療費決策支援</title>
+<title>糖三臟｜糖尿病資料研究模型示範</title>
 <style>
 :root{
   --teal:#0B7C85; --teald:#075E66; --tealdk:#063B40; --ink:#1B3138; --mute:#5E747C;
@@ -227,19 +227,19 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
 <!-- ============ 首頁 ============ -->
 <section id="scr-home" class="screen">
   <div class="card tinted">
-    <span class="badge">◆ 研究原型｜輔仁大學統計資訊學系「糖三臟取西經」</span>
-    <h1>三分鐘，看懂你的<br>糖尿病風險與餘生醫療費</h1>
-    <p style="margin:.3rem 0 .2rem">回答幾個簡單問題（檢驗值<b>有就填、沒有可留白</b>），依 <b>100 位真實病患</b>建立的研究模型，馬上告訴你：</p>
+    <span class="badge">◆ Undergraduate research / coursework prototype</span>
+    <h1>糖尿病資料研究<br>模型分數與 CGM 指標示範</h1>
+    <p style="margin:.3rem 0 .2rem">以公開 ShanghaiT2DM dataset 的研究模型參數，展示輸入特徵與 CGM 讀值的探索性分析；不是個人臨床預測。</p>
     <div class="pillrow">
-      <span class="pill p1"><i>①</i>長期併發症風險</span>
-      <span class="pill p2"><i>②</i>短期血糖穩定度</span>
-      <span class="pill p3"><i>③</i>你的處置象限 A–D</span>
-      <span class="pill p4"><i>④</i>餘生醫療費估算</span>
+          <span class="pill p1"><i>①</i>併發症關聯分類分數</span>
+          <span class="pill p2"><i>②</i>CGM 模型情境</span>
+          <span class="pill p3"><i>③</i>研究示範分組 A–D</span>
+          <span class="pill p4"><i>④</i>研究成本情境</span>
     </div>
-    <p class="note">本工具為<b>學術研究原型</b>，不是醫療診斷、不取代醫師。所有計算在你的裝置完成，<b>資料不上傳</b>、關閉即消失。</p>
+    <p class="note">本工具為 undergraduate research / coursework prototype，尚未經臨床驗證；不可用於診斷、治療或個別病患之未來臨床事件預測。資料在你的裝置計算，不會由本頁上傳。</p>
   </div>
   <div class="card noprint">
-    <details><summary>這個 App 的每個數字從哪來？（參數來源與驗證）</summary>
+    <details><summary>研究原型的資料來源與限制</summary>
       <div id="auditBox"></div>
     </details>
   </div>
@@ -392,15 +392,15 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
     <div class="cmp"><span class="me" id="sumFreq"></span><span id="sumCost">餘生費用計算中…</span></div>
   </div>
   <div class="card compass">
-    <h2><span class="ic">◎</span>你的風險羅盤</h2>
+    <h2><span class="ic">◎</span>研究模型分數</h2>
     <div class="gaugebox">
-      <div class="gauge"><svg id="gaugeSvg" viewBox="0 0 240 152" role="img" aria-label="長期風險量表"></svg>
+      <div class="gauge"><svg id="gaugeSvg" viewBox="0 0 240 152" role="img" aria-label="併發症關聯分類模型分數"></svg>
         <div style="text-align:center;margin-top:-.5rem"><span class="bignum" id="pAnyTxt">--%</span><br>
-        <span class="small">未來產生「任一併發症」的模型風險</span></div></div>
+        <span class="small">併發症關聯分類的模型分數；不代表未來發生機率</span></div></div>
       <div>
         <div class="quadmini" aria-hidden="true">
-          <div class="qC" id="tC">C<small>血糖波動</small></div><div class="qA" id="tA">A<small>立即介入</small></div>
-          <div class="qD" id="tD">D<small>常規追蹤</small></div><div class="qB" id="tB">B<small>慢性追蹤</small></div>
+          <div class="qC" id="tC">C<small>CGM 分數較高</small></div><div class="qA" id="tA">A<small>兩項分數較高</small></div>
+          <div class="qD" id="tD">D<small>兩項分數較低</small></div><div class="qB" id="tB">B<small>分類分數較高</small></div>
         </div>
         <div class="quadname" id="quadName">—</div>
         <div class="small" id="quadDesc" style="text-align:center"></div>
@@ -409,15 +409,15 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
   </div>
 
   <div class="card">
-    <h2><span class="ic">％</span>三項長期風險</h2>
+    <h2><span class="ic">％</span>併發症模型分數</h2>
     <div id="riskRows"></div>
-    <p class="small">分級以研究族群三分位為界；模型交叉驗證 AUC：任一 0.821、小血管 0.852、大血管 0.826。</p>
+    <p class="small">分級依研究示範模型的分數切分；不是經臨床驗證的風險門檻，也不代表未來事件機率。</p>
   </div>
 
   <div class="card">
-    <h2><span class="ic a">？</span>為什麼是這個結果</h2>
+    <h2><span class="ic a">？</span>模型分數說明</h2>
     <div id="whyList"></div>
-    <p class="small">列出對「任一併發症」影響最大的個人因素（與研究 SHAP／勝算比解釋一致）。留白項目不列入。</p>
+    <p class="small">列出在此模型中與分數方向相關的已輸入特徵；這是探索性模型關聯，不代表因果效果或個人醫療判斷。</p>
   </div>
 
   <div class="card">
@@ -443,9 +443,9 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
       <div class="small">畫法同研究個別波動圖：綠區＝70–180、虛線＝70／180，橫軸為當天時刻。</div>
     </div>
     <div id="mkvBox" hidden style="margin-top:.8rem;border-top:2px solid var(--line);padding-top:.7rem">
-      <div style="font-weight:800;color:var(--teald)">未來走勢預估 <span class="small" id="mkvState"></span></div>
+      <div style="font-weight:800;color:var(--teald)">Markov 狀態轉移情境（研究示範） <span class="small" id="mkvState"></span></div>
       <div class="cmp" id="mkvChips"></div>
-      <p class="small">依研究全體血糖轉移矩陣（每 15 分鐘一步，表 4-7-2）自你最後一筆血糖推算；此為族群平均走勢、非個人化預測，24 小時已接近穩態（出範圍 21.1%）。</p>
+      <p class="small">依研究轉移矩陣計算的示範情境；受取樣間隔與模型假設限制，不是個人臨床預測，也不保證實際血糖走勢。</p>
     </div>
   </div>
 
@@ -461,21 +461,22 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
   </div>
 
   <div class="card">
-    <h2><span class="ic c">＄</span>餘生醫療費估算</h2>
+    <h2><span class="ic c">＄</span>研究假設下的成本情境</h2>
     <div class="costnum"><span class="bignum" id="costTxt">計算中…</span>
-      <span class="small">人民幣（2024 幣值，3% 折現）</span></div>
+      <span class="small">人民幣情境值</span></div>
     <svg class="hist" id="histSvg" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true"></svg>
     <div class="costband" id="costBand"><i id="costRange"></i><b id="costPin"></b></div>
     <div class="small" id="costCi"></div>
     <div class="small" id="costMeta"></div>
     <div class="cmp" id="costCmp"></div>
     <p class="small" id="twdHint"></p>
+    <p class="small">此為依研究假設產生的探索性情境模擬，不是個人實際或未來醫療費用預測。</p>
   </div>
 
   <div class="card">
-    <h2><span class="ic">→</span>下一步建議</h2>
+    <h2><span class="ic">→</span>研究結果說明</h2>
     <ul class="next" id="nextList"></ul>
-    <p class="note">此結果由學術模型推算（樣本 100 位、上海族群），僅供參考與就醫討論，<b>不是診斷</b>。任何用藥或治療調整請與醫師討論。</p>
+    <p class="note"><b>Research/coursework prototype. Not clinically validated. Not intended for diagnosis, treatment, or prospective clinical prediction.</b><br>本工具為研究／課程專題原型，尚未經臨床驗證，不可用於診斷、治療或個別病患之未來臨床事件預測。若有健康或治療相關疑問，請與合格醫療專業人員討論。</p>
   </div>
 
   <div class="card noprint">
@@ -487,13 +488,12 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
   <div class="card noprint">
     <details><summary>關於這個工具（資料、模型、參數來源與限制）</summary>
       <div class="kv" style="margin-top:.6rem">
-        <b>資料</b><span>Shanghai_T2DM 公開資料集：100 位第二型糖尿病患者、109 筆紀錄、33 項臨床變數、112,379 筆 CGM 讀數。</span>
-        <b>長期風險</b><span>Logistic Regression 標準化係數（依病患分組 5 折交叉驗證）。留白欄位以族群中位數代入。</span>
-        <b>短期風險</b><span>匯入檔案時＝研究原始算法（個人轉移矩陣、起點範圍內、P^96 出範圍機率，逐筆讀值、不做天平均——與程式一致）；手動輸入時＝出範圍占比近似（研究已證與穩態差 &lt;1.3pp）。</span>
-        <b>象限門檻</b><span>長期＝本模型於 109 筆研究樣本之預測中位數、短期＝16.3%（實際數值見下方參數表）。</span>
-        <b>費用</b><span>陳興寶等（2003）四組年費用 × 上海醫療 CPI 1.374（2001→2024）× 生命表餘命年金（3% 折現），蒙地卡羅 4,000 次。</span>
-        <b>限制</b><span>橫斷面設計、上海單一中心、成本一階近似；外推至台灣請保守解讀。</span>
-        <b>隱私</b><span>全部在裝置上計算，不上傳、不儲存。</span>
+        <b>資料</b><span>ShanghaiT2DM dataset：100 位第二型糖尿病患者、109 筆臨床紀錄、超過 112,000 筆 CGM 讀值。資料來源：<a href="https://doi.org/10.6084/m9.figshare.c.6310860" target="_blank" rel="noopener">Figshare ShanghaiT2DM dataset</a>；授權：CC BY 4.0。</span>
+        <b>引用</b><span>Zhao Q, Zhu J, Shen X, et al. Chinese diabetes datasets for data-driven machine learning. <i>Scientific Data</i> 10, 35 (2023). <a href="https://doi.org/10.1038/s41597-023-01940-7" target="_blank" rel="noopener">https://doi.org/10.1038/s41597-023-01940-7</a></span>
+        <b>模型分數</b><span>依研究 Logistic Regression 參數展示目前輸入特徵與既有併發症狀態的探索性關聯；不是校準機率或未來事件預測。</span>
+        <b>CGM 情境</b><span>CGM 指標依使用者輸入資料計算；Markov 結果是研究模型假設下的情境展示。</span>
+        <b>限制</b><span>研究／課程原型，尚未經臨床驗證；資料為觀察性研究資料，結果不構成診斷或治療建議。</span>
+        <b>隱私</b><span>本頁不會由瀏覽器程式上傳使用者匯入的資料；載入試算表解析套件時仍需網路連線。</span>
       </div>
       <div id="auditBox2"></div>
     </details>
@@ -515,7 +515,7 @@ input.bad{border-color:var(--coral)!important;background:#FFF6F6}
 <script>
 /* 糖三臟決策支援 — 計算引擎（原始資料精確重現版）*/
 (function (root) {
-  const P = {"stats": {"Age": {"log": false, "med": 63.0, "mean": 60.30275229357798, "scale": 13.94188763966308}, "Height": {"log": false, "med": 1.66, "mean": 1.655321100917431, "scale": 0.09476013956387003}, "Weight": {"log": false, "med": 66.0, "mean": 66.2908256880734, "scale": 11.952033655096153}, "BMI": {"log": false, "med": 23.597004206422486, "mean": 24.093780081185315, "scale": 3.297141101836426}, "Gender": {"log": false, "med": 1.0, "mean": 0.5412844036697247, "scale": 0.49829268308257874}, "Smoking": {"log": false, "med": 0.0, "mean": 0.1559633027522936, "scale": 0.3628205492345906}, "Alcohol": {"log": false, "med": 0.0, "mean": 0.11926605504587157, "scale": 0.32410131619551735}, "Duration": {"log": true, "med": 2.0794415416798357, "mean": 1.795475160317613, "scale": 1.0870536746721695}, "FPG": {"log": true, "med": 5.071416766356115, "mean": 5.051587284518867, "scale": 0.3343313149144169}, "PPG": {"log": true, "med": 5.526249434594043, "mean": 5.522938908639992, "scale": 0.310379920090951}, "Cpep_f": {"log": true, "med": 0.3435897043900769, "mean": 0.3646514135065955, "scale": 0.1539051360132553}, "Cpep_2h": {"log": true, "med": 0.6042562421839839, "mean": 0.6151963184135375, "scale": 0.23474852339495156}, "Ins_f": {"log": true, "med": 4.142326174272217, "mean": 4.162174064890219, "scale": 0.6986816558887416}, "Ins_2h": {"log": true, "med": 5.487005374446543, "mean": 5.438615827565105, "scale": 0.5771610014142143}, "HbA1c": {"log": false, "med": 67.21900000000001, "mean": 74.10790825688073, "scale": 25.51849145966321}, "GA": {"log": false, "med": 22.25, "mean": 23.619724770642204, "scale": 7.683578994373709}, "TC": {"log": true, "med": 1.7387102481382397, "mean": 1.74306753080552, "scale": 0.17915878134237298}, "TG": {"log": true, "med": 0.9593502213346021, "mean": 0.970950433926936, "scale": 0.2819775190211068}, "HDL": {"log": false, "med": 1.06, "mean": 1.121467889908257, "scale": 0.3110969809203384}, "LDL": {"log": false, "med": 3.18, "mean": 3.1314678899082566, "scale": 0.9091056454873744}, "Cr": {"log": true, "med": 4.142340445048964, "mean": 4.1258755576860775, "scale": 0.2816391084613183}, "eGFR": {"log": true, "med": 4.68213122712422, "mean": 4.701469549708133, "scale": 0.3119523439960046}, "UA": {"log": true, "med": 5.772281891080893, "mean": 5.771026271707005, "scale": 0.2623721479229607}, "BUN": {"log": true, "med": 1.8870696490323797, "mean": 1.9098055851471327, "scale": 0.22899803602689917}}, "coefs": {"any": {"Age": 0.7202668930305116, "Height": 0.15633562555850386, "Weight": -0.008921630329531426, "BMI": -0.13106603293025565, "Gender": -0.2562161216396589, "Smoking": 0.9357171270447358, "Alcohol": 0.6253897123628849, "Duration": 0.8191353885505608, "FPG": 0.054885417806485204, "PPG": -0.48071267852208716, "Cpep_f": -0.3935195538614768, "Cpep_2h": 0.0971650961234134, "Ins_f": 1.0580294751185213, "Ins_2h": -0.42538832327380677, "HbA1c": 0.9679456811777053, "GA": 0.4086306711702491, "TC": 0.0684400303962653, "TG": 0.6799128225715302, "HDL": -0.16544911774411192, "LDL": -0.4927198034452923, "Cr": 0.44122013662619936, "eGFR": 0.2861859119139578, "UA": -1.2804960369811895, "BUN": -0.016605440629030757}, "macro": {"Age": 0.9955033629270791, "Height": -0.051372583841260276, "Weight": 0.04583880409304188, "BMI": 0.06708336708162564, "Gender": -0.24770921302675086, "Smoking": 0.8048156802656289, "Alcohol": 0.4757571115486075, "Duration": 0.6015803163378691, "FPG": 0.18231093687266953, "PPG": -0.4597722509467859, "Cpep_f": -0.5426504672073568, "Cpep_2h": 0.04796808911244001, "Ins_f": 0.9799272917031083, "Ins_2h": -0.6110098490355529, "HbA1c": 0.6588578248847434, "GA": 0.4812730147591716, "TC": 0.1843686509123005, "TG": 0.5090418769970285, "HDL": -0.7045085480648653, "LDL": -0.45931547031295433, "Cr": 0.4557728075271952, "eGFR": 0.27128608438133456, "UA": -0.9924032570179105, "BUN": 0.0838899433133843}, "micro": {"Age": 0.09190122054571129, "Height": 0.8520894428335596, "Weight": 0.34024383104298195, "BMI": -0.12541021052447343, "Gender": -0.5627073736881767, "Smoking": 1.020102834142433, "Alcohol": 0.9884896899284777, "Duration": 1.1770323201647725, "FPG": -0.3096600786919543, "PPG": -0.34196071949434304, "Cpep_f": -0.8000452988285086, "Cpep_2h": 0.435711896582667, "Ins_f": 0.5120233326307082, "Ins_2h": -0.40085294334654814, "HbA1c": 0.7386051635432096, "GA": 0.20112976296997978, "TC": 0.08916635355537866, "TG": 0.2085226884189019, "HDL": 0.2804000873263938, "LDL": -0.19917937279208672, "Cr": -0.06398920746870118, "eGFR": -0.018989505320105612, "UA": -0.31743349323377906, "BUN": 0.4303669965799364}}, "intercepts": {"any": -0.30921027059048184, "macro": -0.4575539245906906, "micro": -0.9473707169126365}, "cuts": {"longMed": 0.2760884522541277, "anyTert": [0.13296069006635364, 0.701090058902623], "macroTert": [0.1132322407779423, 0.632900478293743], "microTert": [0.07322432916834463, 0.39798761834939483], "shortMed": 16.332, "feelPresets": [9.2, 16.3, 33.0, 46.5]}, "cohort": {"costMedian": 192909, "quadCost": {"A": 455165, "B": 420861, "C": 155048, "D": 146002}, "quadInfo": {"A": {"n": 38, "real": 73.7}, "B": {"n": 17, "real": 52.9}, "C": {"n": 17, "real": 17.6}, "D": {"n": 37, "real": 8.1}}, "auc": {"any": 0.821, "micro": 0.852, "macro": 0.826}}, "cost": {"none": 3726.36, "macro": 15373.87, "micro": 11842.05, "both": 38580.24, "cv": 0.3, "infl": 1.3737, "disc": 0.03}, "life": {"20": 58, "30": 49, "40": 39, "50": 30, "55": 26, "60": 21.5, "65": 17.5, "70": 14, "75": 10.8, "80": 8, "85": 5.8, "90": 4.1, "95": 3.0, "100": 2.0}, "validation": {"coefMaxDiff": {"any": 6.730727086790012e-16, "macro": 4.996003610813204e-16, "micro": 6.661338147750939e-16}, "tests": [{"raw": {"Age": 57.0, "Height": 1.69, "Weight": 67.4, "BMI": 23.6, "Gender": 1.0, "Smoking": 0.0, "Alcohol": 0.0, "Duration": 25.0, "FPG": 82.44, "PPG": 162.36, "Cpep_f": 0.27, "Cpep_2h": 0.91, "Ins_f": 87.6, "Ins_2h": 508.8, "HbA1c": 59.568, "GA": 14.9, "TC": 4.07, "TG": 0.61, "HDL": 2.28, "LDL": 1.86, "Cr": 105.0, "eGFR": 68.0, "UA": 245.0, "BUN": 4.9}, "pAny": 0.540692563339943, "pMacro": 0.05687711241356828, "pMicro": 0.7902555295893164}, {"raw": {"Age": 78.0, "Height": 1.55, "Weight": 60.0, "BMI": 24.973985431841832, "Gender": 0.0, "Smoking": 0.0, "Alcohol": 0.0, "Duration": 20.0, "FPG": 257.40000000000003, "PPG": 228.06, "Cpep_f": 0.37, "Cpep_2h": 0.4, "Ins_f": 49.45, "Ins_2h": 387.04, "HbA1c": 92.35799999999999, "GA": 38.1, "TC": 2.63, "TG": 1.53, "HDL": 0.71, "LDL": 1.19, "Cr": 49.0, "eGFR": 113.0, "UA": 230.09, "BUN": 3.96}, "pAny": 0.9859128752116445, "pMacro": 0.9888925774140289, "pMicro": 0.19367427274549223}, {"raw": {"Age": 46.0, "Height": 1.72, "Weight": 60.0, "BMI": 20.2812330989724, "Gender": 1.0, "Smoking": 1.0, "Alcohol": 1.0, "Duration": 1.0, "FPG": 275.40000000000003, "PPG": 427.86, "Cpep_f": 0.53, "Cpep_2h": 0.54, "Ins_f": 53.27, "Ins_2h": 59.72, "HbA1c": 101.102, "GA": 29.3, "TC": 4.01, "TG": 1.61, "HDL": 0.69, "LDL": 2.92, "Cr": 60.6, "eGFR": 133.0, "UA": 494.0, "BUN": 6.32}, "pAny": 0.8058295501960981, "pMacro": 0.8430341428432808, "pMicro": 0.8817292701387826}]}, "markov": {"stepMin": 15, "states": ["低血糖（<70）", "範圍內（70–180）", "高血糖（>180）"], "M": [[0.8290922901633118, 0.17090770983668818, 0.0], [0.00507252120155346, 0.9729503277890375, 0.021977151009409075], [0.0, 0.09230551759883146, 0.9076944824011686]], "stationary": [0.023399999999999997, 0.7888, 0.18780000000000002]}, "cgmCohort": {"mean": {"mean": 141.66, "p25": 118.96, "p50": 140.03, "p75": 157.67}, "CV": {"mean": 28.36, "p25": 23.78, "p50": 27.45, "p75": 32.91}, "GMI": {"mean": 6.7, "p25": 6.16, "p50": 6.66, "p75": 7.08}, "TIR": {"mean": 77.68, "p25": 66.91, "p50": 83.52, "p75": 90.82}, "TBR": {"mean": 2.36, "p25": 0.0, "p50": 0.33, "p75": 1.8}, "TAR": {"mean": 19.96, "p25": 5.81, "p50": 14.64, "p75": 31.06}}, "lstm": {"n": 109, "skillMedian": 36.8, "beatPct": 99.1, "rmseMedian": 5.3, "baseRmseMedian": 8.47}, "summaryMap": {"Age": "Age (years)", "Height": "Height (m)", "Weight": "Weight (kg)", "BMI": "BMI (kg/m2)", "Gender": "Gender (Female=1, Male=2)", "Smoking": "Smoking History (pack year)", "Alcohol": "Alcohol Drinking History (drinker/non-drinker)", "Duration": "Duration of diabetes (years)", "FPG": "Fasting Plasma Glucose (mg/dl)", "PPG": "2-hour Postprandial Plasma Glucose (mg/dl)", "Cpep_f": "Fasting C-peptide (nmol/L)", "Cpep_2h": "2-hour Postprandial C-peptide (nmol/L)", "Ins_f": "Fasting Insulin (pmol/L)", "Ins_2h": "2-hour Postprandial insulin (pmol/L)", "HbA1c": "HbA1c (mmol/mol)", "GA": "Glycated Albumin (%)", "TC": "Total Cholesterol (mmol/L)", "TG": "Triglyceride (mmol/L)", "HDL": "High-Density Lipoprotein Cholesterol (mmol/L)", "LDL": "Low-Density Lipoprotein Cholesterol (mmol/L)", "Cr": "Creatinine (umol/L)", "eGFR": "Estimated Glomerular Filtration Rate  (ml/min/1.73m2) ", "UA": "Uric Acid (mmol/L)", "BUN": "Blood Urea Nitrogen (mmol/L)"}};
+  const P = {"stats": {"Age": {"log": false, "med": 63.0, "mean": 60.30275229357798, "scale": 13.94188763966308}, "Height": {"log": false, "med": 1.66, "mean": 1.655321100917431, "scale": 0.09476013956387003}, "Weight": {"log": false, "med": 66.0, "mean": 66.2908256880734, "scale": 11.952033655096153}, "BMI": {"log": false, "med": 23.597004206422486, "mean": 24.093780081185315, "scale": 3.297141101836426}, "Gender": {"log": false, "med": 1.0, "mean": 0.5412844036697247, "scale": 0.49829268308257874}, "Smoking": {"log": false, "med": 0.0, "mean": 0.1559633027522936, "scale": 0.3628205492345906}, "Alcohol": {"log": false, "med": 0.0, "mean": 0.11926605504587157, "scale": 0.32410131619551735}, "Duration": {"log": true, "med": 2.0794415416798357, "mean": 1.795475160317613, "scale": 1.0870536746721695}, "FPG": {"log": true, "med": 5.071416766356115, "mean": 5.051587284518867, "scale": 0.3343313149144169}, "PPG": {"log": true, "med": 5.526249434594043, "mean": 5.522938908639992, "scale": 0.310379920090951}, "Cpep_f": {"log": true, "med": 0.3435897043900769, "mean": 0.3646514135065955, "scale": 0.1539051360132553}, "Cpep_2h": {"log": true, "med": 0.6042562421839839, "mean": 0.6151963184135375, "scale": 0.23474852339495156}, "Ins_f": {"log": true, "med": 4.142326174272217, "mean": 4.162174064890219, "scale": 0.6986816558887416}, "Ins_2h": {"log": true, "med": 5.487005374446543, "mean": 5.438615827565105, "scale": 0.5771610014142143}, "HbA1c": {"log": false, "med": 67.21900000000001, "mean": 74.10790825688073, "scale": 25.51849145966321}, "GA": {"log": false, "med": 22.25, "mean": 23.619724770642204, "scale": 7.683578994373709}, "TC": {"log": true, "med": 1.7387102481382397, "mean": 1.74306753080552, "scale": 0.17915878134237298}, "TG": {"log": true, "med": 0.9593502213346021, "mean": 0.970950433926936, "scale": 0.2819775190211068}, "HDL": {"log": false, "med": 1.06, "mean": 1.121467889908257, "scale": 0.3110969809203384}, "LDL": {"log": false, "med": 3.18, "mean": 3.1314678899082566, "scale": 0.9091056454873744}, "Cr": {"log": true, "med": 4.142340445048964, "mean": 4.1258755576860775, "scale": 0.2816391084613183}, "eGFR": {"log": true, "med": 4.68213122712422, "mean": 4.701469549708133, "scale": 0.3119523439960046}, "UA": {"log": true, "med": 5.772281891080893, "mean": 5.771026271707005, "scale": 0.2623721479229607}, "BUN": {"log": true, "med": 1.8870696490323797, "mean": 1.9098055851471327, "scale": 0.22899803602689917}}, "coefs": {"any": {"Age": 0.7202668930305116, "Height": 0.15633562555850386, "Weight": -0.008921630329531426, "BMI": -0.13106603293025565, "Gender": -0.2562161216396589, "Smoking": 0.9357171270447358, "Alcohol": 0.6253897123628849, "Duration": 0.8191353885505608, "FPG": 0.054885417806485204, "PPG": -0.48071267852208716, "Cpep_f": -0.3935195538614768, "Cpep_2h": 0.0971650961234134, "Ins_f": 1.0580294751185213, "Ins_2h": -0.42538832327380677, "HbA1c": 0.9679456811777053, "GA": 0.4086306711702491, "TC": 0.0684400303962653, "TG": 0.6799128225715302, "HDL": -0.16544911774411192, "LDL": -0.4927198034452923, "Cr": 0.44122013662619936, "eGFR": 0.2861859119139578, "UA": -1.2804960369811895, "BUN": -0.016605440629030757}, "macro": {"Age": 0.9955033629270791, "Height": -0.051372583841260276, "Weight": 0.04583880409304188, "BMI": 0.06708336708162564, "Gender": -0.24770921302675086, "Smoking": 0.8048156802656289, "Alcohol": 0.4757571115486075, "Duration": 0.6015803163378691, "FPG": 0.18231093687266953, "PPG": -0.4597722509467859, "Cpep_f": -0.5426504672073568, "Cpep_2h": 0.04796808911244001, "Ins_f": 0.9799272917031083, "Ins_2h": -0.6110098490355529, "HbA1c": 0.6588578248847434, "GA": 0.4812730147591716, "TC": 0.1843686509123005, "TG": 0.5090418769970285, "HDL": -0.7045085480648653, "LDL": -0.45931547031295433, "Cr": 0.4557728075271952, "eGFR": 0.27128608438133456, "UA": -0.9924032570179105, "BUN": 0.0838899433133843}, "micro": {"Age": 0.09190122054571129, "Height": 0.8520894428335596, "Weight": 0.34024383104298195, "BMI": -0.12541021052447343, "Gender": -0.5627073736881767, "Smoking": 1.020102834142433, "Alcohol": 0.9884896899284777, "Duration": 1.1770323201647725, "FPG": -0.3096600786919543, "PPG": -0.34196071949434304, "Cpep_f": -0.8000452988285086, "Cpep_2h": 0.435711896582667, "Ins_f": 0.5120233326307082, "Ins_2h": -0.40085294334654814, "HbA1c": 0.7386051635432096, "GA": 0.20112976296997978, "TC": 0.08916635355537866, "TG": 0.2085226884189019, "HDL": 0.2804000873263938, "LDL": -0.19917937279208672, "Cr": -0.06398920746870118, "eGFR": -0.018989505320105612, "UA": -0.31743349323377906, "BUN": 0.4303669965799364}}, "intercepts": {"any": -0.30921027059048184, "macro": -0.4575539245906906, "micro": -0.9473707169126365}, "cuts": {"longMed": 0.2760884522541277, "anyTert": [0.13296069006635364, 0.701090058902623], "macroTert": [0.1132322407779423, 0.632900478293743], "microTert": [0.07322432916834463, 0.39798761834939483], "shortMed": 16.332, "feelPresets": [9.2, 16.3, 33.0, 46.5]},  "cost": {"none": 3726.36, "macro": 15373.87, "micro": 11842.05, "both": 38580.24, "cv": 0.3, "infl": 1.3737, "disc": 0.03}, "life": {"20": 58, "30": 49, "40": 39, "50": 30, "55": 26, "60": 21.5, "65": 17.5, "70": 14, "75": 10.8, "80": 8, "85": 5.8, "90": 4.1, "95": 3.0, "100": 2.0}, "markov": {"stepMin": 15, "states": ["低血糖（<70）", "範圍內（70–180）", "高血糖（>180）"], "M": [[0.8290922901633118, 0.17090770983668818, 0.0], [0.00507252120155346, 0.9729503277890375, 0.021977151009409075], [0.0, 0.09230551759883146, 0.9076944824011686]], "stationary": [0.023399999999999997, 0.7888, 0.18780000000000002]},   "summaryMap": {"Age": "Age (years)", "Height": "Height (m)", "Weight": "Weight (kg)", "BMI": "BMI (kg/m2)", "Gender": "Gender (Female=1, Male=2)", "Smoking": "Smoking History (pack year)", "Alcohol": "Alcohol Drinking History (drinker/non-drinker)", "Duration": "Duration of diabetes (years)", "FPG": "Fasting Plasma Glucose (mg/dl)", "PPG": "2-hour Postprandial Plasma Glucose (mg/dl)", "Cpep_f": "Fasting C-peptide (nmol/L)", "Cpep_2h": "2-hour Postprandial C-peptide (nmol/L)", "Ins_f": "Fasting Insulin (pmol/L)", "Ins_2h": "2-hour Postprandial insulin (pmol/L)", "HbA1c": "HbA1c (mmol/mol)", "GA": "Glycated Albumin (%)", "TC": "Total Cholesterol (mmol/L)", "TG": "Triglyceride (mmol/L)", "HDL": "High-Density Lipoprotein Cholesterol (mmol/L)", "LDL": "Low-Density Lipoprotein Cholesterol (mmol/L)", "Cr": "Creatinine (umol/L)", "eGFR": "Estimated Glomerular Filtration Rate  (ml/min/1.73m2) ", "UA": "Uric Acid (mmol/L)", "BUN": "Blood Urea Nitrogen (mmol/L)"}};
 
   function mulberry32(seed){let a=seed>>>0;return function(){a|=0;a=(a+0x6D2B79F5)|0;
     let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;
@@ -981,7 +981,7 @@ function show(i){
   step = i;
   screens.forEach((s,j)=>$(s).hidden = j!==i);
   $("btnBack").hidden = i===0;
-  $("btnNext").textContent = i===0?"開始評估": i===3?"看結果": i===4?"重新評估一次":"下一步";
+  $("btnNext").textContent = i===0?"開始示範": i===3?"查看示範結果": i===4?"重新示範":"下一步";
   drawStepper(); window.scrollTo({top:0,behavior:reduceMotion?"auto":"smooth"});
   if (i===4) renderResults();
 }
@@ -1179,22 +1179,10 @@ const NAMES = {Age:"年齡",Height:"身高",Weight:"體重",BMI:"BMI",Gender:"�
  HbA1c:"糖化血色素",GA:"糖化白蛋白",TC:"總膽固醇",TG:"三酸甘油酯",HDL:"HDL（好膽固醇）",
  LDL:"LDL",Cr:"肌酸酐",eGFR:"eGFR",UA:"尿酸",BUN:"尿素氮"};
 const QUAD = {
- A:{name:"A｜立即介入",desc:"長期與短期風險都偏高",tips:[
-    "盡快回診，與醫師討論併發症篩檢（眼底、腎功能、心血管）",
-    "與醫療團隊檢視目前的血糖藥物與監測頻率",
-    "本研究中此象限實際併發症比例 73.7%、餘生費用平均約 45.5 萬"]},
- B:{name:"B｜慢性追蹤",desc:"長期風險高、血糖相對穩定",tips:[
-    "維持規律回診，定期做併發症篩檢",
-    "把重點放在血壓、血脂與體重等長期因子",
-    "本研究中此象限實際併發症比例 52.9%、餘生費用平均約 42.1 萬"]},
- C:{name:"C｜血糖波動注意",desc:"長期風險低、但血糖不穩",tips:[
-    "檢視飲食時間、藥物與低血糖情形，必要時與醫師調整",
-    "增加血糖量測（尤其懷疑偏低或偏高的時段）",
-    "此族群容易被單看長期風險的評估漏掉——請持續注意血糖安全"]},
- D:{name:"D｜常規追蹤",desc:"目前兩項風險都相對低",tips:[
-    "保持現在的生活與用藥習慣，按時回診",
-    "每年至少一次完整檢查（HbA1c、血脂、腎功能、眼底）",
-    "本研究中此象限實際併發症比例 8.1%、餘生費用平均約 14.6 萬"]}};
+ A:{name:"A｜兩項模型分數較高",desc:"兩項研究示範分數均落在較高分組",tips:["此分組只描述研究模型分數，不代表未來臨床事件。"]},
+ B:{name:"B｜分類分數較高",desc:"併發症關聯分類分數較高，CGM 分數相對較低",tips:["此分組只描述研究模型分數，不代表未來臨床事件。"]},
+ C:{name:"C｜CGM 分數較高",desc:"CGM 示範分數較高，併發症分類分數相對較低",tips:["此分組只描述研究模型分數，不代表未來臨床事件。"]},
+ D:{name:"D｜兩項模型分數較低",desc:"兩項研究示範分數均落在相對較低分組",tips:["此分組只描述研究模型分數，不代表未來臨床事件。"]}};
 
 /* SVG：量表（漸層弧＋刻度） */
 function drawGauge(p){
@@ -1251,39 +1239,14 @@ function countUp(el, target, fmt){
 
 /* 參數稽核面板（動態列出引擎內實際數值） */
 function buildAudit(){
-  const P=E.P;
-  const V=P.validation||{};
-  const maxCd = V.coefMaxDiff ? Math.max(...Object.values(V.coefMaxDiff)) : 0;
-  let liveErr=null;
-  if (V.tests){ liveErr = Math.max(...V.tests.map(tc=>{
-    const r=E.riskModel(tc.raw);
-    return Math.max(Math.abs(r.any.p-tc.pAny),Math.abs(r.macro.p-tc.pMacro),Math.abs(r.micro.p-tc.pMicro));
-  })); }
-  const topC = t => Object.entries(P.coefs[t]).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,3)
-      .map(([k,c])=>`${NAMES[k]||k} ${c>0?"+":""}${c.toFixed(2)}`).join("、");
   const html = `
   <table class="audit">
-    <tr><th>App 使用的數值（引擎內即時讀取）</th><th>來源檔案</th></tr>
-    <tr><td>任一併發症前 3 大係數：${topC("any")}（共 24 項全載入）</td><td><code>lr_oddsratio_Any_Complication.csv</code></td></tr>
-    <tr><td>小血管前 3 大係數：${topC("micro")}</td><td><code>lr_oddsratio_Microvascular.csv</code></td></tr>
-    <tr><td>大血管前 3 大係數：${topC("macro")}</td><td><code>lr_oddsratio_Macrovascular.csv</code></td></tr>
-    <tr><td>截距（class_weight=balanced）：任一 ${P.intercepts.any.toFixed(4)}、大血管 ${P.intercepts.macro.toFixed(4)}、小血管 ${P.intercepts.micro.toFixed(4)}</td><td><code>Shanghai_T2DM_Summary.xlsx</code> 全資料重跑 sklearn</td></tr>
-    <tr><td>缺值插補中位數與標準化 mean/scale（24 項，log 空間）</td><td>同上（SimpleImputer／StandardScaler 實際擬合值）</td></tr>
-    <tr><td>象限門檻：長期 ${(P.cuts.longMed*100).toFixed(1)}%（本模型 109 筆預測中位數）、短期 ${P.cuts.shortMed.toFixed(1)}%</td><td><code>Summary.xlsx</code>＋<code>patient_risk_table.csv</code></td></tr>
-    <tr><td>「用感覺估」四選項＝短期風險 Q25／中位／Q75／Q90：${(P.cuts.feelPresets||[]).join("％／")}％</td><td><code>patient_risk_table.csv</code></td></tr>
-    <tr><td>血糖三態轉移矩陣（走勢預估；逐點對照收斂表誤差 &lt;0.005pp）</td><td><code>markov_3state.csv／markov_convergence_3state.csv</code></td></tr>
-    <tr><td>CGM 品質指標（平均／SD／CV／GMI／TIR／TBR／TAR）：與 <code>cgm_metrics()</code> 逐項比對病患 2000_0 全 8 欄，最大差 1e-13</td><td><code>cgm_lstm_markov1.py</code>、<code>cgm_metrics.csv</code></td></tr>
-    <tr><td>族群比較值（TIR 中位 ${P.cgmCohort.TIR.p50}%、CV ${P.cgmCohort.CV.p50}% 等）</td><td><code>cgm_descriptive.csv</code></td></tr>
-    <tr><td>LSTM 成效敘述：${P.lstm.beatPct}% 勝過基準、改善中位數 ${P.lstm.skillMedian}%</td><td><code>lstm_pooled_vs_baseline.csv</code>（本 App 不重跑深度學習）</td></tr>
-    <tr><td>檢驗報告匯入欄位對照（24 項）與編碼：性別 1→0／2→1、抽菸 pack-year&gt;0→1、飲酒 drinker→1、「/」→缺值</td><td><code>diabetes_deterioration_pipeline1.py</code> 之 <code>load_data()</code></td></tr>
-    <tr><td>CGM 檔案分析＝研究同款：逐筆讀值（不做天平均）、個人 3×3 轉移矩陣、起點「範圍內」、P^96 出範圍＝短期風險；以 2 位真實病患檔對照 <code>patient_risk_table.csv</code>，8 項指標最大差 &lt;0.0005</td><td><code>deterioration_risk1.py</code></td></tr>
-    <tr><td>四組年費用：${P.cost.none}／${P.cost.macro}／${P.cost.micro}／${P.cost.both} 元（2001 人民幣）</td><td><code>lifetime_cost_montecarlo1.py</code>（陳興寶 2003）</td></tr>
-    <tr><td>CPI 校正 ×${P.cost.infl}、折現 ${(P.cost.disc*100)}%、成本 CV ${P.cost.cv}、生命表餘命內插</td><td>同上腳本 <code>MEDICAL_CPI／LIFE_EXPECTANCY</code></td></tr>
-    <tr><td>象限平均費用 A ${fmtWan(P.cohort.quadCost.A)}／B ${fmtWan(P.cohort.quadCost.B)}／C ${fmtWan(P.cohort.quadCost.C)}／D ${fmtWan(P.cohort.quadCost.D)}</td><td><code>patient_lifetime_cost_mc.csv</code></td></tr>
-    <tr><td>AUC 任一 ${P.cohort.auc.any}、小血管 ${P.cohort.auc.micro}、大血管 ${P.cohort.auc.macro}</td><td><code>model_results.csv</code></td></tr>
+    <tr><th>研究原型內容</th><th>解讀</th></tr>
+    <tr><td>併發症分數</td><td>用於展示研究模型對輸入特徵的關聯分類結果，不代表未來事件機率。</td></tr>
+    <tr><td>CGM 指標與 Markov 情境</td><td>依目前輸入資料與研究模型假設計算；不構成臨床預測。</td></tr>
+    <tr><td>成本情境</td><td>依研究參數展示探索性模擬，不是個人實際或未來醫療費用預測。</td></tr>
   </table>
-  <p class="small" style="margin:.5rem 0 0"><b>驗證（每次開啟即時重跑）：</b>係數與研究輸出檔最大差 ${maxCd.toExponential(1)}；以原始資料 3 位真實病患輸入本引擎，機率與 sklearn 最大誤差 <b>${liveErr==null?"—":liveErr.toExponential(1)}</b>；成本引擎對照 <code>patient_lifetime_cost_mc.csv</code> 均值誤差 0–1.8%。<br>
-  先前三處近似（截距、標準化統計、感覺估選項）<b>已全部以原始資料精確重算</b>，與研究 Python 管線一致。</p>`;
+  <p class="small" style="margin:.5rem 0 0">本 App 不在瀏覽器重訓練模型或執行臨床驗證；repository 未附原始資料與版本化研究輸出，這些示範分數無法由本頁獨立重現。</p>`;
   $("auditBox").innerHTML = html;
   $("auditBox2").innerHTML = html;
 }
@@ -1314,15 +1277,15 @@ function renderResults(){
   const q = E.quadrant(rm.any.p, sr), qi = QUAD[q];
   const QCOLOR={A:"#D64550",B:"#E7A33C",C:"#4C7FD0",D:"#3E9B6B"};
   const SUMTXT={
-    A:"長期併發症風險與近期血糖不穩程度都偏高，屬於最需要盡快回診處理的一群。",
-    B:"長期併發症風險偏高，但近期血糖相對穩定；重點放在規律回診與長期因子控制。",
-    C:"長期風險不高，但血糖起伏偏大；請注意血糖安全，必要時與醫師調整藥物或飲食。",
-    D:"兩項風險目前都相對低；維持現況、按時回診即可。"};
+    A:"兩項研究示範模型分數均較高；這不是未來臨床事件預測。",
+    B:"併發症關聯分類分數較高，CGM 示範分數相對較低。",
+    C:"CGM 示範分數較高，併發症關聯分類分數相對較低。",
+    D:"兩項研究示範模型分數均相對較低；這不是臨床判斷。"};
   $("sumCard").style.borderTopColor = QCOLOR[q];
-  $("sumQuad").textContent = "你屬於：" + qi.name;
+  $("sumQuad").textContent = "研究示範分組：" + qi.name;
   $("sumQuad").style.color = QCOLOR[q];
   $("sumText").textContent = SUMTXT[q];
-  $("sumFreq").textContent = `模型估計：100 位條件相似者中，約 ${Math.round(rm.any.p*100)} 位會發生任一併發症`;
+  $("sumFreq").textContent = "探索性模型分數；不代表未來發生機率";
   $("sumCost").textContent = "餘生費用計算中…";
   ["A","B","C","D"].forEach(k=>$("t"+k).classList.toggle("on",k===q));
   $("quadName").textContent = qi.name;
@@ -1345,14 +1308,14 @@ function renderResults(){
     const up=c.add>0, w=Math.max(8, Math.abs(c.add)/maxAdd*100);
     return `<div class="why ${up?'up':'dn'}"><span class="wbar" style="width:${w.toFixed(0)}%"></span>
       <span class="arr">${up?'↑':'↓'}</span>
-      <b>${NAMES[c.key]||c.key}</b> ${up?'使風險升高':'具保護作用'}
-      <span class="small">（影響 ${Math.abs(c.add).toFixed(2)}）</span></div>`;
-  }).join("") : `<p class="small">填的項目越多，這裡的個人化解釋越完整。</p>`;
+        <b>${NAMES[c.key]||c.key}</b> ${up?'與較高模型分數相關':'與較低模型分數相關'}
+        <span class="small">（模型中的正／負向貢獻 ${Math.abs(c.add).toFixed(2)}）</span></div>`;
+      }).join("") : `<p class="small">輸入資料可展示模型中的特徵關聯；不是個人化醫療解釋。</p>`;
 
   drawTir(tir);
   $("tirTxt").textContent = tir.toFixed(0)+"%";
   $("tarTbr").textContent = srObj ? `偏高（>180）：${srObj.TAR.toFixed(1)}%　偏低（<70）：${srObj.TBR.toFixed(1)}%（共 ${srObj.n} 筆）` : "（以你的感覺估算）";
-  $("srNote").innerHTML = `短期風險分數 <b>${sr.toFixed(1)}%</b>（族群中位數 ${E.P.cuts.shortMed.toFixed(1)}%）<br><span class="badgeok">${srcTag}</span>`;
+  $("srNote").innerHTML = `CGM 模型情境分數 <b>${sr.toFixed(1)}%</b>；不是個人臨床預測<br><span class="badgeok">${srcTag}</span>`;
   // 天平均圖（匯入檔案時顯示於短期卡）
   if (m==="file" && cgmData){
     $("dailyBox").hidden=false; drawDaily2(cgmData.daily);
@@ -1364,8 +1327,8 @@ function renderResults(){
 
   if (m==="file" && cgmData){
     const H=cgmData.analysis.horizons;
-    $("mkvState").textContent = "（你的個人轉移矩陣・起點＝範圍內，與研究定義相同）";
-    $("mkvChips").innerHTML = [["1h","1 小時"],["4h","4 小時"],["24h","24 小時"]].map(([k,lb])=>{
+    $("mkvState").textContent = "（依輸入 CGM 建立的轉移矩陣・起點＝範圍內）";
+    $("mkvChips").innerHTML = [["1h","1 小時情境"],["4h","4 小時情境"],["24h","24 小時情境"]].map(([k,lb])=>{
       const oor=H["hypo_"+k]+H["hyper_"+k];
       return `<span>${lb}後出範圍 ${oor.toFixed(1)}%</span>`;
     }).join("");
@@ -1374,8 +1337,8 @@ function renderResults(){
     const sorted = manualReadings.slice().sort((a,b)=> a.d===b.d ? a.uid-b.uid : (a.d<b.d?-1:1));
     const last = sorted[sorted.length-1].g;
     const st = E.glucoseState(last);
-    $("mkvState").textContent = `（全體矩陣・自最後一筆 ${last} mg/dL 推算）`;
-    $("mkvChips").innerHTML = [[4,"1 小時"],[16,"4 小時"],[96,"24 小時"]].map(([k,lb])=>{
+    $("mkvState").textContent = "（研究全體矩陣・以輸入資料末筆狀態作為情境起點）";
+    $("mkvChips").innerHTML = [[4,"1 小時情境"],[16,"4 小時情境"],[96,"24 小時情境"]].map(([k,lb])=>{
       const oor=E.outOfRange(E.markovProject(st,k))*100;
       return `<span>${lb}後出範圍 ${oor.toFixed(1)}%</span>`;
     }).join("");
@@ -1385,23 +1348,21 @@ function renderResults(){
   // ---- 血糖品質指標（僅在有實際讀值時） ----
   const metVals = (m==="file" && cgmData) ? cgmData.values : (m==="num" && manualReadings.length ? readingsValues() : null);
   if (metVals){
-    const M = E.cgmMetrics(metVals), C = E.P.cgmCohort;
+    const M = E.cgmMetrics(metVals);
     const fmt1 = x=>x.toFixed(1);
     const ROWS=[
-      ["平均血糖", fmt1(M.mean)+" mg/dL", fmt1(C.mean.p50)],
-      ["標準差 SD", fmt1(M.SD)+" mg/dL", "—"],
-      ["變異係數 CV", fmt1(M.CV)+" %", fmt1(C.CV.p50)],
-      ["GMI（估計糖化血色素）", M.GMI.toFixed(2)+" %", C.GMI.p50.toFixed(2)],
-      ["TIR 在範圍內（70–180）", fmt1(M.TIR)+" %", fmt1(C.TIR.p50)],
-      ["TAR 偏高（&gt;180）", fmt1(M.TAR)+" %", fmt1(C.TAR.p50)],
-      ["TBR 偏低（&lt;70）", fmt1(M.TBR)+" %", fmt1(C.TBR.p50)],
-      ["讀值筆數", M.n+" 筆", "—"],
+      ["平均血糖", fmt1(M.mean)+" mg/dL"],
+      ["標準差 SD", fmt1(M.SD)+" mg/dL"],
+      ["變異係數 CV", fmt1(M.CV)+" %"],
+      ["GMI（估計糖化血色素）", M.GMI.toFixed(2)+" %"],
+      ["TIR 在範圍內（70–180）", fmt1(M.TIR)+" %"],
+      ["TAR 偏高（&gt;180）", fmt1(M.TAR)+" %"],
+      ["TBR 偏低（&lt;70）", fmt1(M.TBR)+" %"],
+      ["讀值筆數", M.n+" 筆"],
     ];
-    $("metTable").innerHTML = `<tr><th>指標</th><th>你的數值</th><th>研究族群中位數（n=109）</th></tr>`+
-      ROWS.map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td><td>${r[2]}</td></tr>`).join("");
-    const L=E.P.lstm;
-    $("lstmNote").innerHTML = `指標定義與計算與研究 <code>cgm_lstm_markov1.py</code> 的 <code>cgm_metrics()</code> 完全相同（SD 為母體標準差、GMI＝3.31＋0.02392×平均）。<br>
-      關於 LSTM：研究以跨病患合併訓練的 LSTM 預測短時血糖，${L.n} 位病患中 <b>${L.beatPct}%</b> 勝過持續性基準、改善中位數 <b>${L.skillMedian}%</b>（RMSE 中位數 ${L.rmseMedian} vs 基準 ${L.baseRmseMedian}）。該模型為離線訓練，本 App 不重跑深度學習，短期風險改用研究同款馬可夫轉移矩陣（表 4-7-2）計算。`;
+    $("metTable").innerHTML = `<tr><th>指標</th><th>依輸入資料計算</th></tr>`+
+      ROWS.map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td></tr>`).join("");
+    $("lstmNote").textContent = "本 repository 另有探索性 LSTM 分析；此 App 不執行 LSTM，也不以 LSTM 結果產生臨床預測。";
     $("metCard").hidden=false;
     // 每日血糖波動（點日期切換；僅匯入檔且有時間戳時）
     if (m==="file" && cgmData && cgmData.byDayPts && !("全部" in cgmData.byDayPts)){
@@ -1432,19 +1393,15 @@ function renderResults(){
     const c = E.simulateCost(rm.macro.p, rm.micro.p, age, 4000, 42);
     countUp($("costTxt"), c.mean, x=>fmtWan(x));
     drawHist(c.dist, c.mean);
-    $("costCi").textContent = `95% 模擬區間：${fmtWan(c.lo)} ～ ${fmtWan(c.hi)}`;
-    $("costMeta").textContent = `依 ${age} 歲平均餘命約 ${c.years.toFixed(0)} 年估算；平均每年約 ${fmtWan(c.annual)}。直條圖為 4,000 次模擬的分布，紅線＝平均。`;
+    $("costCi").textContent = `研究假設下的 95% 模擬區間：${fmtWan(c.lo)} ～ ${fmtWan(c.hi)}`;
+    $("costMeta").textContent = "依研究成本與餘命假設形成的情境分布；不是個人實際或未來醫療費用預測。";
     const maxRef = Math.max(c.hi, 6e5);
     $("costRange").style.left = (c.lo/maxRef*100)+"%";
     $("costRange").style.width = ((c.hi-c.lo)/maxRef*100)+"%";
     $("costPin").style.left = (Math.min(c.mean/maxRef,1)*100)+"%";
-    const QC2 = E.P.cohort.quadCost;
-    $("costCmp").innerHTML =
-      `<span class="me">你：${fmtWan(c.mean)}</span>`+
-      `<span>族群中位 ${fmtWan(E.P.cohort.costMedian)}</span>`+
-      ["A","B","C","D"].map(k=>`<span>${k} 平均 ${fmtWan(QC2[k])}</span>`).join("");
-    $("twdHint").textContent = `參考換算：約新台幣 ${(c.mean*4.4/1e4).toFixed(0)} 萬（以 1 人民幣 ≈ 4.4 台幣粗估，匯率會變動）。`;
-    $("sumCost").textContent = `餘生醫療費估計約 ${fmtWan(c.mean)}（人民幣）`;
+    $("costCmp").innerHTML = "";
+    $("twdHint").textContent = "僅供研究與教學展示，不代表個人費用預測。";
+    $("sumCost").textContent = `研究成本情境：${fmtWan(c.mean)}（人民幣）`;
   }, 60);
 }
 

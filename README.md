@@ -10,7 +10,7 @@
 - 臨床與 CGM 二維風險整合；
 - 探索性餘生前瞻醫療成本情境模擬。
 
-本專案屬研究原型，不可直接作為臨床診斷、治療建議、個人未來發病率或正式醫療資源配置依據。
+本專案為 undergraduate research / coursework prototype，尚未經臨床驗證，不可用於診斷、治療或個別病患之未來臨床事件預測，也不應作為正式醫療資源配置依據。
 
 ---
 
@@ -88,6 +88,8 @@ CGM 序列具有真實時間順序，因此 Markov 狀態轉移與 LSTM 下一�
 - 部分病患具有多次回診紀錄；
 - 109 份 CGM 監測檔；
 - CGM 原則上約每 15 分鐘記錄一次血糖。
+
+資料來源：ShanghaiT2DM dataset，Figshare（CC BY 4.0）。Zhao Q, Zhu J, Shen X, et al. Chinese diabetes datasets for data-driven machine learning. *Scientific Data* 10, 35 (2023). [Article](https://doi.org/10.1038/s41597-023-01940-7) · [Dataset](https://doi.org/10.6084/m9.figshare.c.6310860).
 
 主要分類目標：
 
