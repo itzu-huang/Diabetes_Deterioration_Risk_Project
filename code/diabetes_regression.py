@@ -1,34 +1,37 @@
+# -*- coding: utf-8 -*-
 """
 迴歸問題:以臨床特徵預測 HbA1c(長期血糖控制)
 ====================================================
-對應作業 3.5「迴歸問題:基準模型 Linear Regression + 主要模型 XGBoost」,
+對應作業 3.5「迴歸問題:基準模型 Linear Regression + 主要模型 XGBoost/RF」,
 評估指標為 MAE、RMSE、MAPE、R²(作業 3.6)。與分類流程共用同一套資料處理
-(直接 import diabetes_deterioration_pipeline.load_data),並同樣以 GroupKFold
+(直接 import diabetes_deterioration_pipeline.load_data),並同樣以「依病患分組」之交叉驗證
+  [修正 21:原文寫 GroupKFold;實作為隨機分派病患至 5 折 × 100 次重複]
 依病患分組交叉驗證,避免病患層級洩漏。
 
-目標可替換:改 TARGET 可預測其他連續變數(如 FPG、BMI)，但若更換 TARGET，
-必須同步將目標欄位從特徵中排除，並檢查 load_data() 是否對該目標進行 log1p 轉換。
-不能只修改 TARGET 一行 ; 
-若要以 TIR 或 GMI 為目標，目前需另外撰寫病患編號合併流程；
-本檔僅提供實作方向，尚未自動併入 cgm_metrics.csv。
+目標可替換:改 TARGET 即可預測其他連續變數(如 FPG、BMI);若要預測 CGM 衍生的
+TIR / GMI,見檔尾 REG_ON_CGM 說明(會把 cgm_metrics.csv 併回)。
 
 環境:需要 pandas, numpy, scikit-learn, matplotlib;xgboost 選用(無則退回
 HistGradientBoostingRegressor)。與 diabetes_deterioration_pipeline.py 放同目錄。
-
-----------------------------------------------------------------
-【X / Y 定義與解讀】
-----------------------------------------------------------------
-X:
-  除 HbA1c 與 GA 外的臨床特徵。Patient Number 僅用於 GroupKFold 分組，
-  不可作為預測特徵。
-
-Y:
-  該次臨床紀錄的 HbA1c 連續值。
-
-本模型回答的是「目前臨床特徵能否估計同次量測的 HbA1c」，不是未來 HbA1c
-變化的縱向預測。若要預測未來 HbA1c，需有明確基準日期、後續量測日期及時間順序。
 """
 
+
+# ---------------------------------------------------------------------------
+# [修正 32] Windows 主控台編碼防護。
+#   本專案之輸出含 ✓ ≤ − ä ² ≈ 等字元,不在繁體中文 Windows 之預設編碼 cp950 內。
+#   當 stdout 是「主控台」時 Python 走 WriteConsoleW,不受影響;但當 stdout 被
+#   導向「管線」(例如 verify_all.py 以 capture_output=True 抓取子程序輸出,或
+#   使用者自行 `python x.py > log.txt`)時,Python 改用地區編碼 cp950 編碼,
+#   即拋出 UnicodeEncodeError 並中止 —— 程式本身沒錯,卻因為印不出一個勾勾而失敗。
+#   此處只改「遇到無法編碼之字元時的行為」(改為以 ? 取代),不動編碼本身,
+#   故主控台顯示維持正常。
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    try:
+        _s.reconfigure(errors="replace")
+    except Exception:
+        pass
+# ---------------------------------------------------------------------------
 import os
 import numpy as np
 import pandas as pd
@@ -45,7 +48,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GroupKFold, cross_val_predict
+from sklearn.model_selection import PredefinedSplit, cross_val_predict   # 〔稽核修正 CODE-26〕刪除未使用之 GroupKFold
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.inspection import permutation_importance
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -104,21 +107,50 @@ def main():
     X = d[feats].copy()
     keep = y.notna().values
     X, y, g = X[keep].reset_index(drop=True), y[keep].reset_index(drop=True), pid[keep].reset_index(drop=True)
-    print(f"迴歸目標 = {TARGET} | N = {len(y)} | 特徵數 = {len(feats)} | CV = GroupKFold(依病患)\n")
+    # [修正 18] 原印出 "GroupKFold(依病患)",但 [修正 A] 起已改為「隨機把病患
+    #   分派到 5 折」(fold_assign + PredefinedSplit)重複 100 次。名稱須與實作一致。
+    print(f"迴歸目標 = {TARGET} | N = {len(y)} | 特徵數 = {len(feats)} | "
+          f"CV = 隨機分派病患至 5 折(PredefinedSplit) × 100 次重複，依病患分組\n")
 
-    cv = GroupKFold(n_splits=5)
+    # [修正 A] 原本使用 GroupKFold(5)(未設 shuffle),折分配由 argsort
+    #          的平手順序決定,不可跨平台重現;實測 R2 在不同折分配下由 -0.03 到 0.33。
+    #          〔稽核修正 B-15〕原寫「該類別不接受 random_state」已過時(scikit-learn 1.6 起
+    #          GroupKFold 支援 shuffle/random_state);改採下列作法之理由(可重現、可附區間)不變。
+    #          改為「隨機把病患分派到 5 折」重複 N_REPEATS 次,報告中位數與 95% 區間。
+    N_REPEATS = 100
+    pids = np.array(sorted(set(g)))
+
+    def fold_assign(seed):
+        rs = np.random.RandomState(seed)
+        perm = rs.permutation(len(pids))
+        m = {pids[j]: k % 5 for k, j in enumerate(perm)}
+        return np.array([m[p] for p in g])
+
     rows, oof = [], {}
     main_label = f"{'XGBoost' if HAS_XGB else 'HistGB'} (main)"
     for kind, label, color in [("lin", "Linear Regression (baseline)", "#2563eb"),
                               ("gb", main_label, "#dc2626")]:
-        pipe = make_reg(kind)
-        pred = cross_val_predict(pipe, X, y, cv=cv, groups=g)   # out-of-fold 預測
-        oof[kind] = pred
-        rows.append(dict(Model=label,
-                         MAE=mean_absolute_error(y, pred),
-                         RMSE=float(np.sqrt(mean_squared_error(y, pred))),
-                         MAPE=mape(y, pred),
-                         R2=r2_score(y, pred)))
+        mae_l, rmse_l, mape_l, r2_l = [], [], [], []
+        for r in range(N_REPEATS):
+            fa = fold_assign(SEED + r)
+            p_ = cross_val_predict(make_reg(kind), X, y, cv=PredefinedSplit(fa))
+            if r == 0:
+                oof[kind] = p_          # 圖用第一次(可重現)之 out-of-fold 預測
+            mae_l.append(mean_absolute_error(y, p_))
+            rmse_l.append(float(np.sqrt(mean_squared_error(y, p_))))
+            mape_l.append(mape(y, p_))
+            r2_l.append(r2_score(y, p_))
+        # [修正 20] reg_results.csv 原僅有 Model 一欄可辨識,未記錄迴歸目標、
+        #   樣本數與特徵數。同一檔名在不同 TARGET 下會被覆寫且無從分辨。
+        d_ = dict(Target=TARGET, N=len(y), n_features=len(feats),
+                  Model=label, N_repeats=N_REPEATS)
+        for nm, v in [("MAE", mae_l), ("RMSE", rmse_l), ("MAPE", mape_l), ("R2", r2_l)]:
+            v = np.array(v)
+            d_[f"{nm}_median"] = float(np.median(v))
+            d_[f"{nm}_lo95"] = float(np.percentile(v, 2.5))
+            d_[f"{nm}_hi95"] = float(np.percentile(v, 97.5))
+            d_[f"{nm}_min"] = float(v.min()); d_[f"{nm}_max"] = float(v.max())
+        rows.append(d_)
     R = pd.DataFrame(rows)
     R.to_csv(f"{OUTDIR}/reg_results.csv", index=False, encoding="utf-8-sig")
     print(R.round(3).to_string(index=False))
