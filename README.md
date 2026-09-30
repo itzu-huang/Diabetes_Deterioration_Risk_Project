@@ -8,6 +8,16 @@
 
 [開啟糖三臟研究示範 App](https://itzu-huang.github.io/Diabetes_Deterioration_Risk_Project/)
 
+<p align="center">
+  <a href="https://itzu-huang.github.io/Diabetes_Deterioration_Risk_Project/">
+    <img src="qrcode_app.png" alt="糖三臟決策支援 App QR Code" width="220">
+  </a>
+</p>
+
+<p align="center">
+  <strong>掃描 QR Code 或點擊圖片即可開啟 App</strong>
+</p>
+
 GitHub Pages 使用 `main` 分支的 `/docs`。`docs/index.html` 以相對路徑導向 App；Excel 解析使用同目錄內的 `vendor/xlsx.full.min.js`。使用者匯入的資料在瀏覽器內處理。
 
 公開版保留研究模型參數與彙總結果，移除內嵌的個別病患檢驗測試資料及成本案例。頁面上的建置時驗證摘要不是每次開啟時重新執行的病患案例驗證。
